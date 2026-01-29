@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import {
   Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 interface UploadedFile {
   id: string;
@@ -89,6 +90,8 @@ const StatusBadge = ({ status }: { status: string }) => {
 export default function Uploads() {
   const [uploads] = useState<UploadedFile[]>(mockUploads);
   const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -100,12 +103,49 @@ export default function Uploads() {
     setIsDragging(false);
   }, []);
 
+  const handleFiles = useCallback((files: File[]) => {
+    const validTypes = ['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel', 'application/pdf'];
+    const validFiles = files.filter(file => 
+      validTypes.includes(file.type) || 
+      file.name.endsWith('.csv') || 
+      file.name.endsWith('.xlsx') || 
+      file.name.endsWith('.xls') || 
+      file.name.endsWith('.pdf')
+    );
+
+    if (validFiles.length === 0) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload CSV, XLSX, or PDF files only.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // TODO: Implement actual file upload to storage
+    toast({
+      title: "Files selected",
+      description: `${validFiles.length} file(s) ready for upload.`,
+    });
+    console.log("Selected files:", validFiles);
+  }, [toast]);
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    // Handle file upload
     const files = Array.from(e.dataTransfer.files);
-    console.log("Dropped files:", files);
+    handleFiles(files);
+  }, [handleFiles]);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      handleFiles(files);
+    }
+  }, [handleFiles]);
+
+  const handleButtonClick = useCallback(() => {
+    fileInputRef.current?.click();
   }, []);
 
   return (
@@ -136,7 +176,15 @@ export default function Uploads() {
                   or click to browse. Supports CSV, XLSX, and PDF files.
                 </p>
               </div>
-              <Button className="mt-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".csv,.xlsx,.xls,.pdf"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <Button className="mt-2" onClick={handleButtonClick}>
                 <Plus size={18} className="mr-2" />
                 Select Files
               </Button>
