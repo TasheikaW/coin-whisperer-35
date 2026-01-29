@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,30 +28,12 @@ import {
   Heart,
   Repeat,
   DollarSign,
+  Loader2,
+  X,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface Transaction {
-  id: string;
-  date: string;
-  description: string;
-  merchant: string;
-  amount: number;
-  category: string;
-  account: string;
-  isTransfer: boolean;
-}
-
-const mockTransactions: Transaction[] = [
-  { id: "1", date: "2024-02-10", description: "AMAZON.COM", merchant: "Amazon", amount: -89.99, category: "Shopping", account: "Chase Freedom", isTransfer: false },
-  { id: "2", date: "2024-02-09", description: "UBER EATS", merchant: "Uber Eats", amount: -32.50, category: "Dining", account: "Amex Gold", isTransfer: false },
-  { id: "3", date: "2024-02-09", description: "TRANSFER FROM SAVINGS", merchant: "Internal", amount: 500.00, category: "Transfer", account: "Chase Checking", isTransfer: true },
-  { id: "4", date: "2024-02-08", description: "WHOLE FOODS MARKET", merchant: "Whole Foods", amount: -127.34, category: "Groceries", account: "Amex Gold", isTransfer: false },
-  { id: "5", date: "2024-02-08", description: "SHELL GAS STATION", merchant: "Shell", amount: -45.00, category: "Transportation", account: "Chase Freedom", isTransfer: false },
-  { id: "6", date: "2024-02-07", description: "NETFLIX", merchant: "Netflix", amount: -15.99, category: "Entertainment", account: "Chase Freedom", isTransfer: false },
-  { id: "7", date: "2024-02-07", description: "PAYROLL DEPOSIT", merchant: "Employer", amount: 2750.00, category: "Income", account: "Chase Checking", isTransfer: false },
-  { id: "8", date: "2024-02-06", description: "ELECTRIC COMPANY", merchant: "Duke Energy", amount: -142.00, category: "Utilities", account: "Chase Checking", isTransfer: false },
-];
+import { useTransactions } from "@/hooks/useTransactions";
 
 const categoryIcons: Record<string, React.ReactNode> = {
   Shopping: <ShoppingCart size={16} />,
@@ -78,23 +61,40 @@ const categoryColors: Record<string, string> = {
 };
 
 export default function Transactions() {
+  const { transactions, isLoading, uploadFilter } = useTransactions();
+  const navigate = useNavigate();
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [showTransfers, setShowTransfers] = useState(true);
 
-  const filteredTransactions = mockTransactions.filter((t) => {
-    if (!showTransfers && t.isTransfer) return false;
-    if (categoryFilter !== "all" && t.category !== categoryFilter) return false;
-    if (searchQuery && !t.description.toLowerCase().includes(searchQuery.toLowerCase()) && 
-        !t.merchant.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  });
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((t) => {
+      if (!showTransfers && t.is_transfer) return false;
+      if (categoryFilter !== "all" && t.categories?.name !== categoryFilter) return false;
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesDescription = t.description_raw.toLowerCase().includes(query);
+        const matchesMerchant = t.merchant_normalized?.toLowerCase().includes(query);
+        if (!matchesDescription && !matchesMerchant) return false;
+      }
+      return true;
+    });
+  }, [transactions, showTransfers, categoryFilter, searchQuery]);
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
     }).format(Math.abs(amount));
+
+  const clearUploadFilter = () => {
+    navigate('/transactions');
+  };
+
+  const uploadName = uploadFilter 
+    ? transactions.find(t => t.upload_id === uploadFilter)?.uploads?.filename 
+    : null;
 
   return (
     <AppLayout>
@@ -108,6 +108,26 @@ export default function Transactions() {
           </Button>
         }
       />
+
+      {/* Upload Filter Banner */}
+      {uploadFilter && (
+        <Card className="mb-6 border-accent/50 bg-accent/5">
+          <CardContent className="py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Upload size={18} className="text-accent" />
+                <span className="text-sm">
+                  Showing transactions from: <span className="font-medium">{uploadName || 'Selected upload'}</span>
+                </span>
+              </div>
+              <Button variant="ghost" size="sm" onClick={clearUploadFilter}>
+                <X size={16} className="mr-1" />
+                Clear filter
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card className="mb-6">
@@ -156,64 +176,89 @@ export default function Transactions() {
       <Card>
         <CardHeader className="pb-0">
           <CardTitle className="text-lg font-semibold">
-            {filteredTransactions.length} Transactions
+            {isLoading ? 'Loading...' : `${filteredTransactions.length} Transactions`}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0 mt-4">
-          <div className="overflow-x-auto">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>
-                    <Button variant="ghost" size="sm" className="h-auto p-0 font-medium text-xs uppercase">
-                      Date <ArrowUpDown size={14} className="ml-1" />
-                    </Button>
-                  </th>
-                  <th>Description</th>
-                  <th>Category</th>
-                  <th>Account</th>
-                  <th className="text-right">Amount</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTransactions.map((transaction) => (
-                  <tr key={transaction.id}>
-                    <td className="text-muted-foreground tabular-nums">
-                      {transaction.date}
-                    </td>
-                    <td>
-                      <div>
-                        <p className="font-medium text-foreground">{transaction.merchant}</p>
-                        <p className="text-xs text-muted-foreground">{transaction.description}</p>
-                      </div>
-                    </td>
-                    <td>
-                      <Badge
-                        variant="secondary"
-                        className={cn("flex items-center gap-1.5 w-fit", categoryColors[transaction.category])}
-                      >
-                        {categoryIcons[transaction.category]}
-                        {transaction.category}
-                      </Badge>
-                    </td>
-                    <td className="text-muted-foreground">{transaction.account}</td>
-                    <td className={cn(
-                      "text-right font-medium tabular-nums",
-                      transaction.amount >= 0 ? "text-success" : "text-foreground"
-                    )}>
-                      {transaction.amount >= 0 ? "+" : "-"}{formatCurrency(transaction.amount)}
-                    </td>
-                    <td>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal size={16} />
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="animate-spin text-muted-foreground" size={32} />
+            </div>
+          ) : filteredTransactions.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>No transactions found. Upload a bank statement to get started!</p>
+              <Button variant="outline" className="mt-4" onClick={() => navigate('/uploads')}>
+                <Upload size={16} className="mr-2" />
+                Go to Uploads
+              </Button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>
+                      <Button variant="ghost" size="sm" className="h-auto p-0 font-medium text-xs uppercase">
+                        Date <ArrowUpDown size={14} className="ml-1" />
                       </Button>
-                    </td>
+                    </th>
+                    <th>Description</th>
+                    <th>Category</th>
+                    <th>Source</th>
+                    <th className="text-right">Amount</th>
+                    <th></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filteredTransactions.map((transaction) => {
+                    const categoryName = transaction.categories?.name || 'Uncategorized';
+                    const isInflow = transaction.direction === 'inflow';
+                    
+                    return (
+                      <tr key={transaction.id}>
+                        <td className="text-muted-foreground tabular-nums">
+                          {transaction.transaction_date}
+                        </td>
+                        <td>
+                          <div>
+                            <p className="font-medium text-foreground">
+                              {transaction.merchant_normalized || transaction.description_raw.slice(0, 30)}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                              {transaction.description_raw}
+                            </p>
+                          </div>
+                        </td>
+                        <td>
+                          <Badge
+                            variant="secondary"
+                            className={cn("flex items-center gap-1.5 w-fit", categoryColors[categoryName] || "bg-muted text-muted-foreground")}
+                          >
+                            {categoryIcons[categoryName] || null}
+                            {categoryName}
+                          </Badge>
+                        </td>
+                        <td className="text-muted-foreground text-sm">
+                          {transaction.uploads?.filename || '-'}
+                        </td>
+                        <td className={cn(
+                          "text-right font-medium tabular-nums",
+                          isInflow ? "text-success" : "text-foreground"
+                        )}>
+                          {isInflow ? "+" : "-"}{formatCurrency(transaction.amount)}
+                        </td>
+                        <td>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal size={16} />
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </AppLayout>
