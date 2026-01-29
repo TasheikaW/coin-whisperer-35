@@ -13,6 +13,7 @@ import {
   AlertCircle,
   X,
   Plus,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -25,6 +26,14 @@ interface UploadedFile {
   status: "processing" | "completed" | "error";
   transactions?: number;
   uploadedAt: string;
+}
+
+interface StagedFile {
+  file: File;
+  id: string;
+  name: string;
+  type: "csv" | "xlsx" | "pdf";
+  size: string;
 }
 
 const mockUploads: UploadedFile[] = [
@@ -46,15 +55,19 @@ const mockUploads: UploadedFile[] = [
     transactions: 89,
     uploadedAt: "2024-02-01",
   },
-  {
-    id: "3",
-    name: "bank_statement.pdf",
-    type: "pdf",
-    size: "1.2 MB",
-    status: "processing",
-    uploadedAt: "2024-02-10",
-  },
 ];
+
+const formatFileSize = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const getFileType = (file: File): "csv" | "xlsx" | "pdf" => {
+  if (file.name.endsWith('.csv') || file.type === 'text/csv') return 'csv';
+  if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) return 'xlsx';
+  return 'pdf';
+};
 
 const FileIcon = ({ type }: { type: string }) => {
   if (type === "csv" || type === "xlsx") {
@@ -88,8 +101,10 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 export default function Uploads() {
-  const [uploads] = useState<UploadedFile[]>(mockUploads);
+  const [uploads, setUploads] = useState<UploadedFile[]>(mockUploads);
+  const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -122,12 +137,20 @@ export default function Uploads() {
       return;
     }
 
-    // TODO: Implement actual file upload to storage
+    const newStagedFiles: StagedFile[] = validFiles.map(file => ({
+      file,
+      id: `staged-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: file.name,
+      type: getFileType(file),
+      size: formatFileSize(file.size),
+    }));
+
+    setStagedFiles(prev => [...prev, ...newStagedFiles]);
+    
     toast({
-      title: "Files selected",
-      description: `${validFiles.length} file(s) ready for upload.`,
+      title: "Files added",
+      description: `${validFiles.length} file(s) ready for upload. Click "Upload Files" to proceed.`,
     });
-    console.log("Selected files:", validFiles);
   }, [toast]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -141,11 +164,66 @@ export default function Uploads() {
     if (e.target.files) {
       const files = Array.from(e.target.files);
       handleFiles(files);
+      // Reset input so same file can be selected again
+      e.target.value = '';
     }
   }, [handleFiles]);
 
   const handleButtonClick = useCallback(() => {
     fileInputRef.current?.click();
+  }, []);
+
+  const removeStagedFile = useCallback((id: string) => {
+    setStagedFiles(prev => prev.filter(f => f.id !== id));
+  }, []);
+
+  const handleUpload = useCallback(async () => {
+    if (stagedFiles.length === 0) return;
+
+    setIsUploading(true);
+
+    // Simulate upload processing
+    for (const staged of stagedFiles) {
+      const newUpload: UploadedFile = {
+        id: staged.id,
+        name: staged.name,
+        type: staged.type,
+        size: staged.size,
+        status: "processing",
+        uploadedAt: new Date().toISOString().split('T')[0],
+      };
+      
+      setUploads(prev => [newUpload, ...prev]);
+    }
+
+    // Clear staged files
+    setStagedFiles([]);
+
+    toast({
+      title: "Upload started",
+      description: `Processing ${stagedFiles.length} file(s). This may take a moment.`,
+    });
+
+    // Simulate processing completion after delay
+    setTimeout(() => {
+      setUploads(prev => 
+        prev.map(u => 
+          u.status === "processing" 
+            ? { ...u, status: "completed" as const, transactions: Math.floor(Math.random() * 100) + 10 }
+            : u
+        )
+      );
+      toast({
+        title: "Upload complete",
+        description: "All files have been processed successfully.",
+      });
+    }, 3000);
+
+    setIsUploading(false);
+  }, [stagedFiles, toast]);
+
+  const removeUpload = useCallback((id: string) => {
+    setUploads(prev => prev.filter(u => u.id !== id));
   }, []);
 
   return (
@@ -156,7 +234,7 @@ export default function Uploads() {
       />
 
       {/* Upload Dropzone */}
-      <Card className="mb-8">
+      <Card className="mb-6">
         <CardContent className="p-0">
           <div
             className={cn("dropzone", isDragging && "dropzone-active")}
@@ -192,6 +270,64 @@ export default function Uploads() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Staged Files - Ready for Upload */}
+      {stagedFiles.length > 0 && (
+        <Card className="mb-6 border-accent/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg font-semibold">
+                Ready for Upload ({stagedFiles.length} file{stagedFiles.length > 1 ? 's' : ''})
+              </CardTitle>
+              <Button 
+                onClick={handleUpload} 
+                disabled={isUploading}
+                className="gap-2"
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload size={18} />
+                    Upload Files
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {stagedFiles.map((file) => (
+                <div
+                  key={file.id}
+                  className="flex items-center justify-between p-3 rounded-lg bg-accent/5 border border-accent/20"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 rounded-md bg-card">
+                      <FileIcon type={file.type} />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground text-sm">{file.name}</p>
+                      <p className="text-xs text-muted-foreground">{file.size}</p>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-muted-foreground hover:text-destructive h-8 w-8"
+                    onClick={() => removeStagedFile(file.id)}
+                  >
+                    <X size={16} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Upload History */}
       <Card>
@@ -232,7 +368,12 @@ export default function Uploads() {
                   </div>
                   <div className="flex items-center gap-3">
                     <StatusBadge status={file.status} />
-                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => removeUpload(file.id)}
+                    >
                       <X size={18} />
                     </Button>
                   </div>
