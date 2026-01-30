@@ -13,36 +13,55 @@ import {
   TrendingUp,
   AlertTriangle,
   Lightbulb,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-// Mock data for demo
-const spendingData = [
-  { name: "Groceries", value: 450, color: "hsl(158, 64%, 42%)" },
-  { name: "Dining", value: 280, color: "hsl(38, 92%, 50%)" },
-  { name: "Transportation", value: 320, color: "hsl(199, 89%, 48%)" },
-  { name: "Shopping", value: 520, color: "hsl(262, 83%, 58%)" },
-  { name: "Utilities", value: 180, color: "hsl(210, 40%, 50%)" },
-  { name: "Entertainment", value: 150, color: "hsl(328, 73%, 52%)" },
-];
-
-const trendData = [
-  { month: "Jan", spending: 3200, income: 5500 },
-  { month: "Feb", spending: 2800, income: 5500 },
-  { month: "Mar", spending: 3500, income: 5800 },
-  { month: "Apr", spending: 3100, income: 5500 },
-  { month: "May", spending: 2900, income: 6000 },
-  { month: "Jun", spending: 3400, income: 5500 },
-];
-
-const budgets = [
-  { category: "Groceries", spent: 450, budget: 500 },
-  { category: "Dining", spent: 280, budget: 200 },
-  { category: "Transportation", spent: 320, budget: 400 },
-  { category: "Shopping", spent: 420, budget: 300 },
-];
+import { useDashboardData } from "@/hooks/useDashboardData";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 export default function Dashboard() {
+  const { isLoading, stats, savingsRate, spendingByCategory, monthlyTrends, transactionCount } = useDashboardData();
+  const navigate = useNavigate();
+
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 0,
+    }).format(amount);
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <PageHeader title="Dashboard" description="Track your spending and financial health" />
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="animate-spin text-muted-foreground" size={48} />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (transactionCount === 0) {
+    return (
+      <AppLayout>
+        <PageHeader title="Dashboard" description="Track your spending and financial health" />
+        <Card className="py-12">
+          <CardContent className="text-center">
+            <Wallet className="mx-auto mb-4 text-muted-foreground" size={48} />
+            <h3 className="text-lg font-semibold mb-2">No transactions yet</h3>
+            <p className="text-muted-foreground mb-4">
+              Upload your first bank statement to see your financial insights.
+            </p>
+            <Button onClick={() => navigate('/uploads')}>
+              Go to Uploads
+            </Button>
+          </CardContent>
+        </Card>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <PageHeader
@@ -53,27 +72,24 @@ export default function Dashboard() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard
-          title="Total Balance"
-          value="$12,450"
+          title="Total Income"
+          value={formatCurrency(stats.totalIncome)}
           icon={<Wallet size={24} />}
-          trend={{ value: 8.2, label: "vs last month" }}
         />
         <StatCard
-          title="Monthly Spending"
-          value="$3,420"
+          title="Total Spending"
+          value={formatCurrency(stats.totalSpending)}
           icon={<TrendingDown size={24} />}
-          trend={{ value: -12.5, label: "vs last month" }}
         />
         <StatCard
-          title="Active Accounts"
-          value="4"
+          title="Transactions"
+          value={String(transactionCount)}
           icon={<CreditCard size={24} />}
         />
         <StatCard
           title="Savings Rate"
-          value="32%"
+          value={`${savingsRate}%`}
           icon={<PiggyBank size={24} />}
-          trend={{ value: 5.3, label: "vs last month" }}
         />
       </div>
 
@@ -84,7 +100,11 @@ export default function Dashboard() {
             <CardTitle className="text-lg font-semibold">Spending by Category</CardTitle>
           </CardHeader>
           <CardContent>
-            <SpendingChart data={spendingData} />
+            {spendingByCategory.length > 0 ? (
+              <SpendingChart data={spendingByCategory} />
+            ) : (
+              <p className="text-center text-muted-foreground py-8">No spending data yet</p>
+            )}
           </CardContent>
         </Card>
 
@@ -93,52 +113,49 @@ export default function Dashboard() {
             <CardTitle className="text-lg font-semibold">Income vs Spending</CardTitle>
           </CardHeader>
           <CardContent>
-            <TrendChart data={trendData} />
+            <TrendChart data={monthlyTrends} />
           </CardContent>
         </Card>
       </div>
 
-      {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Budget Progress */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Budget Progress</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {budgets.map((budget) => (
-              <BudgetProgress key={budget.category} {...budget} />
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Insights */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Smart Insights</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <InsightCard
-              icon={<TrendingUp size={20} />}
-              title="Dining spending up 40%"
-              description="You've spent $280 on dining this month, compared to $200 last month."
-              type="warning"
-            />
-            <InsightCard
-              icon={<AlertTriangle size={20} />}
-              title="Shopping budget exceeded"
-              description="You're $120 over your monthly shopping budget."
-              type="warning"
-            />
+      {/* Insights */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold">Smart Insights</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {savingsRate >= 20 ? (
             <InsightCard
               icon={<Lightbulb size={20} />}
               title="Great savings rate!"
-              description="You're saving 32% of your income, above the recommended 20%."
+              description={`You're saving ${savingsRate}% of your income, above the recommended 20%.`}
               type="success"
             />
-          </CardContent>
-        </Card>
-      </div>
+          ) : savingsRate >= 0 ? (
+            <InsightCard
+              icon={<AlertTriangle size={20} />}
+              title="Savings could improve"
+              description={`You're saving ${savingsRate}% of your income. Aim for at least 20%.`}
+              type="warning"
+            />
+          ) : (
+            <InsightCard
+              icon={<TrendingUp size={20} />}
+              title="Spending exceeds income"
+              description="Your expenses are higher than your income this period. Review your spending."
+              type="warning"
+            />
+          )}
+          {spendingByCategory.length > 0 && (
+            <InsightCard
+              icon={<TrendingUp size={20} />}
+              title={`Top spending: ${spendingByCategory[0]?.name}`}
+              description={`Your highest spending category is ${spendingByCategory[0]?.name} at ${formatCurrency(spendingByCategory[0]?.value || 0)}.`}
+              type="info"
+            />
+          )}
+        </CardContent>
+      </Card>
     </AppLayout>
   );
 }
