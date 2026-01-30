@@ -5,7 +5,6 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -34,6 +33,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTransactions } from "@/hooks/useTransactions";
+import { CategorySelect } from "@/components/transactions/CategorySelect";
+import { useToast } from "@/hooks/use-toast";
 
 const categoryIcons: Record<string, React.ReactNode> = {
   Shopping: <ShoppingCart size={16} />,
@@ -61,12 +62,24 @@ const categoryColors: Record<string, string> = {
 };
 
 export default function Transactions() {
-  const { transactions, isLoading, uploadFilter } = useTransactions();
+  const { transactions, isLoading, uploadFilter, updateTransaction, fetchTransactions } = useTransactions();
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [showTransfers, setShowTransfers] = useState(true);
+
+  const handleCategoryChange = async (transactionId: string, categoryId: string) => {
+    const success = await updateTransaction(transactionId, { category_id: categoryId });
+    if (success) {
+      toast({
+        title: 'Category updated',
+        description: 'Transaction category has been changed.',
+      });
+      fetchTransactions();
+    }
+  };
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter((t) => {
@@ -229,14 +242,13 @@ export default function Transactions() {
                             </p>
                           </div>
                         </td>
-                        <td>
-                          <Badge
-                            variant="secondary"
-                            className={cn("flex items-center gap-1.5 w-fit", categoryColors[categoryName] || "bg-muted text-muted-foreground")}
-                          >
-                            {categoryIcons[categoryName] || null}
-                            {categoryName}
-                          </Badge>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <CategorySelect
+                            value={transaction.category_id}
+                            categoryName={categoryName}
+                            onSelect={(catId) => handleCategoryChange(transaction.id, catId)}
+                            compact
+                          />
                         </td>
                         <td className="text-muted-foreground text-sm">
                           {transaction.uploads?.filename || '-'}

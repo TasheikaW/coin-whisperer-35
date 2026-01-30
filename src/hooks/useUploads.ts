@@ -174,28 +174,49 @@ export function useUploads() {
           continue;
         }
 
-        // 4. Insert transactions
+        // 4. Insert transactions in batches to avoid issues
         const transactionsToInsert: TablesInsert<'transactions'>[] = parseResult.transactions.map(t => ({
           user_id: user.id,
           upload_id: uploadData.id,
           transaction_date: t.date,
           description_raw: t.description,
           merchant_normalized: t.description.split(/\s+/).slice(0, 3).join(' ').substring(0, 50),
-          amount: t.amount,
+          amount: Math.abs(t.amount),
           direction: t.direction,
           is_transfer: t.description.toLowerCase().includes('transfer'),
+          currency: 'USD',
         }));
 
-        const { error: transactionError } = await supabase
-          .from('transactions')
-          .insert(transactionsToInsert);
+        // Insert in batches of 50 to avoid payload limits
+        const batchSize = 50;
+        let insertedCount = 0;
+        
+        for (let i = 0; i < transactionsToInsert.length; i += batchSize) {
+          const batch = transactionsToInsert.slice(i, i + batchSize);
+          const { data: insertedData, error: transactionError } = await supabase
+            .from('transactions')
+            .insert(batch)
+            .select();
 
-        if (transactionError) {
-          toast({
-            title: `Failed to save transactions`,
-            description: transactionError.message,
-            variant: 'destructive',
-          });
+          if (transactionError) {
+            console.error('Transaction insert error:', transactionError);
+            toast({
+              title: `Failed to save transactions`,
+              description: transactionError.message,
+              variant: 'destructive',
+            });
+            break;
+          }
+          
+          insertedCount += insertedData?.length || 0;
+        }
+        
+        if (insertedCount === 0) {
+          // Update upload status to error
+          await supabase
+            .from('uploads')
+            .update({ status: 'error', error_message: 'No transactions were saved' })
+            .eq('id', uploadData.id);
           continue;
         }
 
