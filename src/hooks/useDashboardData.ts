@@ -61,10 +61,10 @@ export function useDashboardData() {
   // Calculate stats
   const stats = {
     totalSpending: transactions
-      .filter(t => t.direction === 'outflow' && !t.is_transfer)
+      .filter(t => t.direction === 'debit' && !t.is_transfer)
       .reduce((sum, t) => sum + t.amount, 0),
     totalIncome: transactions
-      .filter(t => t.direction === 'inflow')
+      .filter(t => t.direction === 'credit')
       .reduce((sum, t) => sum + t.amount, 0),
     transactionCount: transactions.length,
   };
@@ -75,7 +75,7 @@ export function useDashboardData() {
 
   // Spending by category
   const spendingByCategory: SpendingByCategory[] = transactions
-    .filter(t => t.direction === 'outflow' && !t.is_transfer)
+    .filter(t => t.direction === 'debit' && !t.is_transfer)
     .reduce((acc, t) => {
       const categoryName = t.categories?.name || 'Uncategorized';
       const existing = acc.find(c => c.name === categoryName);

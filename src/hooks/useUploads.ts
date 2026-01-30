@@ -182,8 +182,8 @@ export function useUploads() {
           description_raw: t.description,
           merchant_normalized: t.description.split(/\s+/).slice(0, 3).join(' ').substring(0, 50),
           amount: Math.abs(t.amount),
-          direction: t.direction,
-          is_transfer: t.description.toLowerCase().includes('transfer'),
+          direction: t.direction, // Now correctly 'debit' or 'credit'
+          is_transfer: /transfer|xfer|tfr|move|payment to|payment from/i.test(t.description),
           currency: 'USD',
         }));
 

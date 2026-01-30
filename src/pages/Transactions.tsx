@@ -225,7 +225,7 @@ export default function Transactions() {
                 <tbody>
                   {filteredTransactions.map((transaction) => {
                     const categoryName = transaction.categories?.name || 'Uncategorized';
-                    const isInflow = transaction.direction === 'inflow';
+                    const isInflow = transaction.direction === 'credit';
                     
                     return (
                       <tr key={transaction.id}>
