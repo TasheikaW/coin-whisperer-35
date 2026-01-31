@@ -37,18 +37,16 @@ export function useDashboardData() {
       return;
     }
 
-    // Fetch transactions from the last 6 months
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
+    // Fetch all transactions (no date filter for now to catch all data)
     const { data } = await supabase
       .from('transactions')
       .select(`
         *,
         categories (name, color)
       `)
-      .gte('transaction_date', sixMonthsAgo.toISOString().split('T')[0])
-      .order('transaction_date', { ascending: false });
+      .order('transaction_date', { ascending: false })
+      .limit(1000);
+
 
     setTransactions(data || []);
     setIsLoading(false);
