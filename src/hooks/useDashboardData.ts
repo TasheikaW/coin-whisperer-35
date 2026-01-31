@@ -110,10 +110,10 @@ export function useDashboardData() {
     monthlyTrends.push({
       month: monthName,
       spending: monthTransactions
-        .filter(t => t.direction === 'outflow' && !t.is_transfer)
+        .filter(t => t.direction === 'debit' && !t.is_transfer)
         .reduce((sum, t) => sum + t.amount, 0),
       income: monthTransactions
-        .filter(t => t.direction === 'inflow')
+        .filter(t => t.direction === 'credit')
         .reduce((sum, t) => sum + t.amount, 0),
     });
   }
