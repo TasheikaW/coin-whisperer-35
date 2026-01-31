@@ -231,8 +231,12 @@ export const parseCSV = async (file: File): Promise<ParseResult> => {
       if (columns.amountCol >= 0) {
         amount = parseAmount(values[columns.amountCol]);
         if (amount !== null) {
-          // Negative amount = debit (money out), Positive = credit (money in)
-          direction = amount < 0 ? 'debit' : 'credit';
+          // For bank statements: positive amount typically = spending (debit)
+          // Negative amount = refund/income (credit)
+          // Only override if we didn't already get direction from type column
+          if (columns.typeCol < 0) {
+            direction = amount >= 0 ? 'debit' : 'credit';
+          }
           amount = Math.abs(amount);
         }
       }
@@ -364,7 +368,10 @@ export const parseXLSX = async (file: File): Promise<ParseResult> => {
       if (columns.amountCol >= 0) {
         amount = parseAmount(row[columns.amountCol] as string | number);
         if (amount !== null) {
-          direction = amount < 0 ? 'debit' : 'credit';
+          // For bank statements: positive amount typically = spending (debit)
+          if (columns.typeCol < 0) {
+            direction = amount >= 0 ? 'debit' : 'credit';
+          }
           amount = Math.abs(amount);
         }
       }
