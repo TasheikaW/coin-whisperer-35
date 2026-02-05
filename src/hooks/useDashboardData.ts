@@ -111,7 +111,7 @@ export function useDashboardData() {
         .filter(t => t.direction === 'debit' && !t.is_transfer)
         .reduce((sum, t) => sum + t.amount, 0),
       income: monthTransactions
-        .filter(t => t.direction === 'credit')
+        .filter(t => t.categories?.name === 'Salary')
         .reduce((sum, t) => sum + t.amount, 0),
     });
   }
