@@ -62,7 +62,7 @@ export function useDashboardData() {
       .filter(t => t.direction === 'debit' && !t.is_transfer)
       .reduce((sum, t) => sum + t.amount, 0),
     totalIncome: transactions
-      .filter(t => t.categories?.name === 'Salary')
+      .filter(t => t.direction === 'credit' && !t.is_transfer)
       .reduce((sum, t) => sum + t.amount, 0),
     transactionCount: transactions.length,
   };
@@ -111,7 +111,7 @@ export function useDashboardData() {
         .filter(t => t.direction === 'debit' && !t.is_transfer)
         .reduce((sum, t) => sum + t.amount, 0),
       income: monthTransactions
-        .filter(t => t.categories?.name === 'Salary')
+        .filter(t => t.direction === 'credit' && !t.is_transfer)
         .reduce((sum, t) => sum + t.amount, 0),
     });
   }
