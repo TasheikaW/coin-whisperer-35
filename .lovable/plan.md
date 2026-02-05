@@ -1,66 +1,94 @@
 
 
-# Fix: Import Transaction Signs Exactly As They Appear in File
+# Simplify Parser: Import Raw Amounts, Derive Direction from Sign
 
-## Problem Identified
+## Current Problem
 
-Your bank statement has the correct sign convention:
-- **Positive amounts** (e.g., 1750) = credits (payments/refunds)
-- **Negative amounts** (e.g., -183.46) = debits (purchases)
+The parser has complex logic trying to detect debit/credit columns with keyword matching that causes false positives (e.g., "Description" matching "in" keyword). This leads to missed transactions.
 
-The parser logic at line 279 (`direction = rawAmount < 0 ? 'debit' : 'credit'`) is correct for this format. However, the PAYMENT transactions are still being stored as `debit` in the database.
+## New Approach: Keep It Simple
 
-**Root Cause**: The keyword `'payment'` is included in `debitKeywords` (line 139), which could cause the parser to detect a debit column incorrectly if any header contains "payment".
+**Import the raw amount with its original sign, then derive direction purely from the sign:**
+- **Positive amount in file → `credit`**
+- **Negative amount in file → `debit`**
 
-Additionally, looking at your file headers:
-- `Account | Account | Transac | Cheque | Description 1 | Description 2 | CAD$`
+No keyword detection for debit/credit columns. No Method 2. Just find the amount column and use its sign.
 
-The column detection might be failing to find the `CAD$` amount column properly, causing it to fall through to Method 2 or Method 3 which have different logic.
+## Changes to `src/lib/fileParser.ts`
 
-## Solution
+### 1. Remove debit/credit column detection entirely
 
-### 1. Remove 'payment' from debitKeywords
-The word "payment" doesn't belong in debit keywords - it's ambiguous and can cause false matches.
-
-**File**: `src/lib/fileParser.ts`  
-**Line 139**: Remove 'payment' from the array
+**Lines 138-142**: Remove the debitKeywords, creditKeywords, and their column detection:
 
 ```typescript
-// Before
-const debitKeywords = ['debit', 'withdrawal', 'out', 'dr', 'expense', 'payment', 'spent'];
-
-// After
+// DELETE these lines:
 const debitKeywords = ['debit', 'withdrawal', 'out', 'dr', 'expense', 'spent'];
+const creditKeywords = ['credit', 'deposit', 'in', 'cr', 'income', 'received'];
+const debitCol = findColumn(debitKeywords);
+const creditCol = findColumn(creditKeywords, ['debit']);
 ```
 
-### 2. Ensure consistent sign handling across all methods
-Method 2 (separate debit/credit columns) forces all debit values to `direction = 'debit'` regardless of the sign in the file. This overrides the user's preferred behavior.
+### 2. Simplify the returned columns object
 
-**Lines 285-296**: Method 2 should be skipped if we already found an amount via Method 1, or we should apply the same sign-based logic.
+**Lines 159-168**: Remove `debitCol` and `creditCol` from the return object:
 
-### 3. Add console logging to debug column detection (temporary)
-To verify what columns are being detected, add logging to help identify the issue.
+```typescript
+return {
+  dateCol: dateCol >= 0 ? dateCol : 0,
+  descCol,
+  descCol2,
+  amountCol,
+  balanceCol,
+  typeCol,
+  accountTypeCol,
+};
+```
 
-## Changes Summary
+### 3. Remove Method 2 (separate debit/credit columns) from parseCSV
 
-| File | Change |
-|------|--------|
-| `src/lib/fileParser.ts` line 139 | Remove 'payment' from `debitKeywords` |
-| Ensure Method 1 handles your file correctly | Verify `CAD$` column is detected as `amountCol` |
+**Lines 285-297**: Delete the entire Method 2 block that tries to read from separate debit/credit columns.
+
+### 4. Simplify Method 1 and Method 3 logic
+
+**Method 1 (lines 271-283)**: 
+```typescript
+// Method 1: Single amount column - use sign directly
+if (columns.amountCol >= 0) {
+  const rawAmount = parseAmount(values[columns.amountCol]);
+  if (rawAmount !== null) {
+    amount = rawAmount; // Keep original sign
+    direction = rawAmount < 0 ? 'debit' : 'credit';
+  }
+}
+```
+
+**Method 3 fallback (lines 299-311)**: Same simplification - just use the raw sign.
+
+### 5. Apply same changes to parseXLSX function
+
+Apply identical simplifications to the XLSX parsing logic.
+
+## Summary of Changes
+
+| Location | Change |
+|----------|--------|
+| Lines 138-142 | Remove debit/credit keyword lists and column detection |
+| Lines 159-168 | Remove debitCol/creditCol from returned columns object |
+| Lines 285-297 | Delete Method 2 entirely |
+| Method 1 & 3 | Use raw amount sign to determine direction |
+| parseXLSX | Apply same simplifications |
+
+## Result
+
+After this change:
+- Parser only looks for: **date**, **description**, **amount** columns
+- Direction is determined purely by the sign in the file
+- `1750` (positive) → stored as `credit` → displays as `+$1,750`
+- `-183.46` (negative) → stored as `debit` → displays as `-$183.46`
+- No more false-positive keyword matching causing transactions to be skipped
 
 ## After Implementation
 
-1. **Delete existing transactions** from the current upload
-2. **Re-upload the file** - the parser should now correctly interpret:
-   - `1750` (positive) → `credit` → displays `+$1,750`
-   - `-183.46` (negative) → `debit` → displays `-$183.46`
-
-## Technical Details
-
-The core logic `direction = rawAmount < 0 ? 'debit' : 'credit'` is already correct. The issue is likely that:
-1. The `amountCol` detection is failing for `CAD$` 
-2. OR the `debitCol` is being triggered by something in the headers
-3. Which causes Method 2 to run instead of Method 1, overriding the sign-based direction
-
-Removing 'payment' from debitKeywords and ensuring consistent column detection should resolve this.
+1. Delete existing transactions from the problematic upload
+2. Re-upload the file to verify all transactions import correctly
 
