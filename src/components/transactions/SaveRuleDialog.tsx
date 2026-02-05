@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useCategoryRules } from '@/hooks/useCategoryRules';
+import { extractVendorName } from '@/lib/vendorExtractor';
 import { Loader2 } from 'lucide-react';
 
 interface SaveRuleDialogProps {
@@ -35,20 +36,23 @@ export function SaveRuleDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Extract the core vendor name for matching
+  const extractedVendor = useMemo(() => extractVendorName(merchantName), [merchantName]);
+
   useEffect(() => {
-    if (open && merchantName) {
+    if (open && extractedVendor) {
       setIsLoading(true);
-      countMatchingTransactions(merchantName, currentTransactionId)
+      countMatchingTransactions(extractedVendor, currentTransactionId)
         .then(count => {
           setMatchingCount(count);
           setIsLoading(false);
         });
     }
-  }, [open, merchantName, currentTransactionId, countMatchingTransactions]);
+  }, [open, extractedVendor, currentTransactionId, countMatchingTransactions]);
 
   const handleApplyAll = async () => {
     setIsSaving(true);
-    const result = await saveRuleAndApplyToAll(merchantName, categoryId, categoryName);
+    const result = await saveRuleAndApplyToAll(extractedVendor, categoryId, categoryName);
     setIsSaving(false);
     
     if (result.success) {
@@ -71,7 +75,7 @@ export function SaveRuleDialog({
           <DialogTitle>Remember this category?</DialogTitle>
           <DialogDescription className="pt-2">
             Apply <span className="font-semibold text-foreground">"{categoryName}"</span> to all
-            transactions from <span className="font-semibold text-foreground">"{merchantName}"</span>?
+            transactions from <span className="font-semibold text-foreground">"{extractedVendor}"</span>?
           </DialogDescription>
         </DialogHeader>
 
