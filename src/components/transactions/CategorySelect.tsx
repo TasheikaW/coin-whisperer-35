@@ -22,7 +22,7 @@ interface Category {
 interface CategorySelectProps {
   value: string | null;
   categoryName?: string;
-  onSelect: (categoryId: string) => void;
+  onSelect: (categoryId: string, categoryName: string) => void;
   compact?: boolean;
 }
 
@@ -70,8 +70,13 @@ export function CategorySelect({ value, categoryName, onSelect, compact = false 
   const displayName = categoryName || 'Uncategorized';
   const colorClass = categoryColors[displayName] || 'bg-muted text-muted-foreground';
 
+  const handleChange = (categoryId: string) => {
+    const selectedCategory = categories.find(c => c.id === categoryId);
+    onSelect(categoryId, selectedCategory?.name || 'Uncategorized');
+  };
+
   return (
-    <Select value={value || ''} onValueChange={onSelect}>
+    <Select value={value || ''} onValueChange={handleChange}>
       <SelectTrigger className={cn(
         "h-auto border-0 p-0 shadow-none focus:ring-0",
         compact && "w-auto"
