@@ -32,8 +32,9 @@ import {
   Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useTransactions } from "@/hooks/useTransactions";
+import { useTransactions, Transaction } from "@/hooks/useTransactions";
 import { CategorySelect } from "@/components/transactions/CategorySelect";
+import { SaveRuleDialog } from "@/components/transactions/SaveRuleDialog";
 import { useToast } from "@/hooks/use-toast";
 
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -69,15 +70,46 @@ export default function Transactions() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [showTransfers, setShowTransfers] = useState(true);
+  
+  // State for save rule dialog
+  const [saveRuleDialogOpen, setSaveRuleDialogOpen] = useState(false);
+  const [pendingRuleData, setPendingRuleData] = useState<{
+    transactionId: string;
+    merchantName: string;
+    categoryId: string;
+    categoryName: string;
+  } | null>(null);
 
-  const handleCategoryChange = async (transactionId: string, categoryId: string) => {
+  const handleCategoryChange = async (transactionId: string, categoryId: string, categoryName: string) => {
+    const transaction = transactions.find(t => t.id === transactionId);
+    if (!transaction) return;
+
     const success = await updateTransaction(transactionId, { category_id: categoryId });
     if (success) {
-      toast({
-        title: 'Category updated',
-        description: 'Transaction category has been changed.',
-      });
+      // Get merchant name for the rule
+      const merchantName = transaction.merchant_normalized || 
+        transaction.description_raw.split(/\s+/).slice(0, 3).join(' ');
+      
+      if (merchantName) {
+        setPendingRuleData({
+          transactionId,
+          merchantName,
+          categoryId,
+          categoryName,
+        });
+        setSaveRuleDialogOpen(true);
+      } else {
+        toast({
+          title: 'Category updated',
+          description: 'Transaction category has been changed.',
+        });
+      }
     }
+  };
+
+  const handleRuleApplied = () => {
+    // Refresh transactions to show updated categories
+    fetchTransactions();
   };
 
   const filteredTransactions = useMemo(() => {
@@ -245,7 +277,7 @@ export default function Transactions() {
                           <CategorySelect
                             value={transaction.category_id}
                             categoryName={categoryName}
-                            onSelect={(catId) => handleCategoryChange(transaction.id, catId)}
+                            onSelect={(catId, catName) => handleCategoryChange(transaction.id, catId, catName)}
                             compact
                           />
                         </td>
@@ -272,6 +304,19 @@ export default function Transactions() {
           )}
         </CardContent>
       </Card>
+
+      {/* Save Rule Dialog */}
+      {pendingRuleData && (
+        <SaveRuleDialog
+          open={saveRuleDialogOpen}
+          onOpenChange={setSaveRuleDialogOpen}
+          merchantName={pendingRuleData.merchantName}
+          categoryId={pendingRuleData.categoryId}
+          categoryName={pendingRuleData.categoryName}
+          currentTransactionId={pendingRuleData.transactionId}
+          onRuleApplied={handleRuleApplied}
+        />
+      )}
     </AppLayout>
   );
 }
