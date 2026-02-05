@@ -1,110 +1,108 @@
 
+# Extract Vendor Name Only for Category Rules
 
-# Add Category Rule Learning: Remember & Apply to Existing
+## Problem
 
-## Overview
+Your transactions have merchant names like:
+- `HOPP/O/2511182241 Toronto`
+- `HOPP/O/2511182131 Toronto`
+- `HOPP/O/2511181428 Toronto`
 
-When you manually change a transaction's category, the system will:
-1. **Prompt** you to save this as a rule for the merchant
-2. **Apply** the category to all existing matching transactions
-3. **Remember** this for future uploads
+Currently, when you categorize one, it uses the full merchant string as the pattern. This means only that exact transaction matches, not all HOPP transactions.
 
-## User Experience
+## Solution
 
-After changing a category, a dialog appears:
-
-```
-+-----------------------------------------+
-|  Remember this category?                |
-|                                         |
-|  Apply "Transportation" to all          |
-|  transactions from "HOPP"?              |
-|                                         |
-|  This will update 3 existing            |
-|  transactions and remember for          |
-|  future uploads.                        |
-|                                         |
-|  [No, just this one]  [Yes, apply all]  |
-+-----------------------------------------+
-```
+Add a vendor extraction function that strips out codes, numbers, and location suffixes to get just the core vendor name.
 
 ## Implementation
 
-### 1. Create Save Rule Dialog Component
+### 1. Create Vendor Extraction Utility
 
-**New file**: `src/components/transactions/SaveRuleDialog.tsx`
+**File**: `src/lib/vendorExtractor.ts` (new file)
 
-A dialog component that:
-- Shows the merchant name and selected category
-- Displays count of existing transactions that will be updated
-- Offers "Just this one" or "Apply to all" options
+```typescript
+export function extractVendorName(merchantString: string): string {
+  if (!merchantString) return '';
+  
+  // Common patterns to extract vendor:
+  // "HOPP/O/2511182241 Toronto" → "HOPP"
+  // "AMAZON.CA*AB1CD2EF3" → "AMAZON"
+  // "UBER* TRIP 12345" → "UBER"
+  
+  let vendor = merchantString.trim();
+  
+  // Split on common separators and take first part
+  vendor = vendor.split(/[\/\*#@]/)[0].trim();
+  
+  // Remove trailing numbers and codes
+  vendor = vendor.replace(/[\d]+$/, '').trim();
+  
+  // Remove common suffixes like location names (if followed by nothing else)
+  vendor = vendor.split(/\s+/)[0];
+  
+  return vendor.toUpperCase();
+}
+```
 
-### 2. Add Hook for Category Rules
+### 2. Update SaveRuleDialog to Show Extracted Vendor
 
-**New file**: `src/hooks/useCategoryRules.ts`
+**File**: `src/components/transactions/SaveRuleDialog.tsx`
 
-Functions to:
-- Save a new category rule to the database
-- Apply category to all matching transactions
-- Check for existing transactions that match the merchant
+- Import the extractor
+- Extract vendor name from `merchantName` prop
+- Display the extracted vendor in the dialog
+- Use extracted vendor for matching and saving rules
 
-### 3. Update Transactions Page
+Dialog will now show:
+```
+Apply "Transportation" to all transactions from "HOPP"?
+This will update 4 existing transactions...
+```
+
+### 3. Update useCategoryRules Hook
+
+**File**: `src/hooks/useCategoryRules.ts`
+
+- Use the extracted vendor name for pattern matching
+- Match transactions where `merchant_normalized` starts with the vendor pattern
+
+### 4. Update Transactions Page
 
 **File**: `src/pages/Transactions.tsx`
 
-Changes:
-- After category change, show the SaveRuleDialog
-- Pass merchant name and category info to dialog
-- Handle dialog response (save rule + update matching transactions)
-
-### 4. Update Transactions Hook
-
-**File**: `src/hooks/useTransactions.ts`
-
-Add new function:
-- `updateMatchingTransactions(merchantPattern, categoryId)` - bulk update all transactions matching the pattern
+- Pass the full merchant name to the dialog (extraction happens inside)
 
 ## Technical Details
 
-### Database Operations
-
-When user clicks "Yes, apply all":
-
+**Vendor extraction logic:**
 ```typescript
-// 1. Save the rule
-await supabase.from('category_rules').insert({
-  user_id: user.id,
-  category_id: categoryId,
-  pattern: merchantNormalized.toLowerCase(),
-  pattern_type: 'merchant',
-  priority: 10  // User rules take priority
-});
+"HOPP/O/2511182241 Toronto" 
+  → split on "/" → ["HOPP", "O", "2511182241 Toronto"]
+  → take first → "HOPP"
 
-// 2. Update all matching transactions
-await supabase
-  .from('transactions')
-  .update({ category_id: categoryId })
-  .eq('user_id', user.id)
-  .ilike('merchant_normalized', `%${merchantNormalized}%`);
+"AMAZON.CA*AB1CD2EF3"
+  → split on "*" → ["AMAZON.CA", "AB1CD2EF3"]  
+  → take first → "AMAZON.CA"
+  → optionally clean to "AMAZON"
 ```
 
-### Merchant Extraction
-
-Uses `merchant_normalized` from the transaction, or falls back to first 3 words of `description_raw`.
+**Matching query:**
+```typescript
+// Match all transactions starting with vendor
+.ilike('merchant_normalized', `${vendorName}%`)
+```
 
 ## Files Summary
 
 | Action | File |
 |--------|------|
-| Create | `src/components/transactions/SaveRuleDialog.tsx` |
-| Create | `src/hooks/useCategoryRules.ts` |
-| Modify | `src/pages/Transactions.tsx` |
-| Modify | `src/hooks/useTransactions.ts` |
+| Create | `src/lib/vendorExtractor.ts` |
+| Modify | `src/components/transactions/SaveRuleDialog.tsx` |
+| Modify | `src/hooks/useCategoryRules.ts` |
 
 ## Result
 
-After implementation:
-- Change "HOPP" to Transportation → Dialog asks to remember
-- Click "Yes, apply all" → Rule saved + all HOPP transactions updated
-- Upload new file next month → HOPP auto-categorized as Transportation
-
+After this change:
+- Categorize any HOPP transaction → Dialog shows "Apply to all HOPP transactions?"
+- Click "Yes, apply all" → All 4 HOPP transactions updated regardless of their codes
+- Future uploads with HOPP (any code) → Auto-categorized as Transportation
