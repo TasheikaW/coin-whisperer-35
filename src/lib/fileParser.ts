@@ -130,7 +130,8 @@ const detectColumns = (headers: string[]): ColumnMapping => {
   // If no description found, look for the longest text column later
   
   // Amount column (single column with positive/negative values)
-  const amountKeywords = ['amount', 'sum', 'value', 'total'];
+  // Also check for currency codes like CAD$, USD$, EUR, GBP, etc.
+  const amountKeywords = ['amount', 'sum', 'value', 'total', 'cad$', 'usd$', 'cad', 'usd', 'eur', 'gbp', 'aud', 'money', 'price'];
   const amountCol = findColumn(amountKeywords, ['debit', 'credit', 'balance', 'running']);
   
   // Separate debit/credit columns
