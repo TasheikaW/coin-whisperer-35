@@ -8,8 +8,7 @@ import { InsightCard } from "@/components/dashboard/InsightCard";
 import { 
   Wallet, 
   TrendingDown, 
-  CreditCard, 
-  PiggyBank,
+  ArrowLeftRight,
   TrendingUp,
   AlertTriangle,
   Lightbulb,
@@ -75,21 +74,26 @@ export default function Dashboard() {
           title="Total Income"
           value={formatCurrency(stats.totalIncome)}
           icon={<Wallet size={24} />}
+          tooltip="Sum of all credit transactions excluding transfers"
         />
         <StatCard
-          title="Total Spending"
+          title="Total Expenses"
           value={formatCurrency(stats.totalSpending)}
           icon={<TrendingDown size={24} />}
+          tooltip="Sum of all debit transactions in selected date range"
         />
         <StatCard
-          title="Transactions"
-          value={String(transactionCount)}
-          icon={<CreditCard size={24} />}
+          title="Net Cash Flow"
+          value={formatCurrency(stats.totalIncome - stats.totalSpending)}
+          icon={<ArrowLeftRight size={24} />}
+          tooltip="Income minus Expenses"
+          valueColor={stats.totalIncome - stats.totalSpending >= 0 ? "positive" : "negative"}
         />
         <StatCard
           title="Savings Rate"
           value={`${savingsRate}%`}
-          icon={<PiggyBank size={24} />}
+          icon={<TrendingUp size={24} />}
+          tooltip="Percentage of income saved after expenses"
         />
       </div>
 
