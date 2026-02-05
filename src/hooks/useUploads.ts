@@ -242,7 +242,7 @@ export function useUploads() {
           amount: Math.abs(t.amount),
           direction: t.direction,
           category_id: autoCategorize(t.description, t.direction),
-          is_transfer: /transfer|xfer|tfr|move|payment to|payment from|zelle|venmo|paypal/i.test(t.description),
+          is_transfer: /transfer|xfer|tfr|move|payment to|payment from|zelle|venmo|paypal|online payment|pmt|payment received|payment - thank/i.test(t.description),
           currency: 'USD',
         }));
 
