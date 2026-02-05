@@ -39,10 +39,10 @@ export function AddBudgetDialog({ existingCategoryIds, onAdd }: AddBudgetDialogP
 
   useEffect(() => {
     const fetchCategories = async () => {
+      // Fetch all categories (same as transaction list)
       const { data } = await supabase
         .from('categories')
-        .select('id, name')
-        .eq('category_type', 'expense')
+        .select('id, name, color')
         .order('name');
       
       if (data) {
