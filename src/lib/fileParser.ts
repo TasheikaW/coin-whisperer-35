@@ -270,19 +270,15 @@ export const parseCSV = async (file: File): Promise<ParseResult> => {
       
       // Method 1: Single amount column
       if (columns.amountCol >= 0) {
-        amount = parseAmount(values[columns.amountCol]);
-        if (amount !== null) {
-          // Determine direction based on sign and statement type
+        const rawAmount = parseAmount(values[columns.amountCol]);
+        if (rawAmount !== null) {
+          // Determine direction based on sign
+          // Credit card statements: negative = purchase (debit), positive = payment/refund (credit)
+          // This matches the raw data convention - no need to flip signs
           if (columns.typeCol < 0) {
-            if (isCreditCard) {
-              // Credit card statements: negative = purchase (debit), positive = payment (credit)
-              direction = amount < 0 ? 'debit' : 'credit';
-            } else {
-              // Bank statements: positive = spending (debit), negative = income (credit)
-              direction = amount >= 0 ? 'debit' : 'credit';
-            }
+            direction = rawAmount < 0 ? 'debit' : 'credit';
           }
-          amount = Math.abs(amount);
+          amount = Math.abs(rawAmount);
         }
       }
       
@@ -307,11 +303,7 @@ export const parseCSV = async (file: File): Promise<ParseResult> => {
             const parsedAmount = parseAmount(values[j]);
             if (parsedAmount !== null && parsedAmount !== 0) {
               amount = Math.abs(parsedAmount);
-              if (isCreditCard) {
-                direction = parsedAmount < 0 ? 'debit' : 'credit';
-              } else {
-                direction = parsedAmount >= 0 ? 'debit' : 'credit';
-              }
+              direction = parsedAmount < 0 ? 'debit' : 'credit';
               break;
             }
           }
@@ -418,19 +410,14 @@ export const parseXLSX = async (file: File): Promise<ParseResult> => {
       
       // Method 1: Single amount column
       if (columns.amountCol >= 0) {
-        amount = parseAmount(row[columns.amountCol] as string | number);
-        if (amount !== null) {
-          // Determine direction based on sign and statement type
+        const rawAmount = parseAmount(row[columns.amountCol] as string | number);
+        if (rawAmount !== null) {
+          // Determine direction based on sign
+          // Credit card statements: negative = purchase (debit), positive = payment/refund (credit)
           if (columns.typeCol < 0) {
-            if (isCreditCard) {
-              // Credit card statements: negative = purchase (debit), positive = payment (credit)
-              direction = amount < 0 ? 'debit' : 'credit';
-            } else {
-              // Bank statements: positive = spending (debit), negative = income (credit)
-              direction = amount >= 0 ? 'debit' : 'credit';
-            }
+            direction = rawAmount < 0 ? 'debit' : 'credit';
           }
-          amount = Math.abs(amount);
+          amount = Math.abs(rawAmount);
         }
       }
       
@@ -455,11 +442,7 @@ export const parseXLSX = async (file: File): Promise<ParseResult> => {
             const parsedAmount = parseAmount(row[j] as string | number);
             if (parsedAmount !== null && parsedAmount !== 0) {
               amount = Math.abs(parsedAmount);
-              if (isCreditCard) {
-                direction = parsedAmount < 0 ? 'debit' : 'credit';
-              } else {
-                direction = parsedAmount >= 0 ? 'debit' : 'credit';
-              }
+              direction = parsedAmount < 0 ? 'debit' : 'credit';
               break;
             }
           }
