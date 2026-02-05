@@ -103,8 +103,6 @@ interface ColumnMapping {
   dateCol: number;
   descCol: number;
   amountCol: number;
-  debitCol: number;
-  creditCol: number;
   balanceCol: number;
   typeCol: number;
   accountTypeCol: number;
@@ -135,12 +133,6 @@ const detectColumns = (headers: string[]): ColumnMapping => {
   const amountKeywords = ['amount', 'sum', 'value', 'total', 'cad$', 'usd$', 'cad', 'usd', 'eur', 'gbp', 'aud', 'money', 'price'];
   const amountCol = findColumn(amountKeywords, ['debit', 'credit', 'balance', 'running']);
   
-  // Separate debit/credit columns
-  const debitKeywords = ['debit', 'withdrawal', 'out', 'dr', 'expense', 'spent'];
-  const creditKeywords = ['credit', 'deposit', 'in', 'cr', 'income', 'received'];
-  const debitCol = findColumn(debitKeywords);
-  const creditCol = findColumn(creditKeywords, ['debit']); // Exclude debit to avoid matching same column
-  
   // Balance column (to exclude from amount detection)
   const balanceCol = findColumn(['balance', 'running', 'available']);
   
@@ -160,8 +152,6 @@ const detectColumns = (headers: string[]): ColumnMapping => {
     dateCol: dateCol >= 0 ? dateCol : 0,
     descCol: descCol >= 0 ? descCol : 1,
     amountCol,
-    debitCol,
-    creditCol,
     balanceCol,
     typeCol,
     accountTypeCol,
@@ -182,37 +172,6 @@ const parseDirectionFromType = (value: string | undefined | null): 'debit' | 'cr
   return null;
 };
 
-// Detect if this is a credit card statement based on data
-const isCreditCardStatement = (rows: string[][], columns: ColumnMapping): boolean => {
-  // Check account type column for credit card indicators
-  if (columns.accountTypeCol >= 0) {
-    for (let i = 1; i < Math.min(rows.length, 10); i++) {
-      const values = parseCSVLine(rows[i].toString());
-      const accountType = values[columns.accountTypeCol]?.toLowerCase() || '';
-      if (accountType.includes('visa') || accountType.includes('mastercard') || 
-          accountType.includes('amex') || accountType.includes('credit') ||
-          accountType.includes('card')) {
-        return true;
-      }
-    }
-  }
-  
-  // Heuristic: if most amounts are negative, it's likely a credit card statement
-  // (purchases show as negative, payments as positive)
-  let negativeCount = 0;
-  let positiveCount = 0;
-  
-  for (let i = 1; i < Math.min(rows.length, 20); i++) {
-    const values = parseCSVLine(rows[i].toString());
-    const amount = columns.amountCol >= 0 ? parseAmount(values[columns.amountCol]) : null;
-    if (amount !== null) {
-      if (amount < 0) negativeCount++;
-      else if (amount > 0) positiveCount++;
-    }
-  }
-  
-  return negativeCount > positiveCount * 2; // If negatives outnumber positives 2:1
-};
 
 export const parseCSV = async (file: File): Promise<ParseResult> => {
   try {
@@ -228,10 +187,7 @@ export const parseCSV = async (file: File): Promise<ParseResult> => {
     const headers = parseCSVLine(headerLine);
     const columns = detectColumns(headers);
     
-    // Detect if this is a credit card statement
-    const isCreditCard = isCreditCardStatement(lines.map(l => [l]), columns);
-    
-    console.log('Detected columns:', { headers, columns, isCreditCard });
+    console.log('Detected columns:', { headers, columns });
     
     const transactions: ParsedTransaction[] = [];
     
@@ -248,7 +204,6 @@ export const parseCSV = async (file: File): Promise<ParseResult> => {
       if (!description) {
         for (let j = 0; j < values.length; j++) {
           if (j !== columns.dateCol && j !== columns.amountCol && 
-              j !== columns.debitCol && j !== columns.creditCol && 
               j !== columns.balanceCol) {
             const val = values[j]?.trim();
             if (val && val.length > 3 && isNaN(parseFloat(val))) {
@@ -268,13 +223,11 @@ export const parseCSV = async (file: File): Promise<ParseResult> => {
         if (typeDirection) direction = typeDirection;
       }
       
-      // Method 1: Single amount column
+      // Method 1: Single amount column - use sign directly
       if (columns.amountCol >= 0) {
         const rawAmount = parseAmount(values[columns.amountCol]);
         if (rawAmount !== null) {
-          // Determine direction based on sign
-          // Credit card statements: negative = purchase (debit), positive = payment/refund (credit)
-          // This matches the raw data convention - no need to flip signs
+          // Derive direction purely from sign: negative = debit, positive = credit
           if (columns.typeCol < 0) {
             direction = rawAmount < 0 ? 'debit' : 'credit';
           }
@@ -282,21 +235,7 @@ export const parseCSV = async (file: File): Promise<ParseResult> => {
         }
       }
       
-      // Method 2: Separate debit/credit columns
-      if (amount === null && (columns.debitCol >= 0 || columns.creditCol >= 0)) {
-        const debit = columns.debitCol >= 0 ? parseAmount(values[columns.debitCol]) : null;
-        const credit = columns.creditCol >= 0 ? parseAmount(values[columns.creditCol]) : null;
-        
-        if (debit !== null && debit !== 0) {
-          amount = Math.abs(debit);
-          direction = 'debit';
-        } else if (credit !== null && credit !== 0) {
-          amount = Math.abs(credit);
-          direction = 'credit';
-        }
-      }
-      
-      // Method 3: Fallback - try to find any numeric column
+      // Method 2: Fallback - try to find any numeric column
       if (amount === null) {
         for (let j = 0; j < values.length; j++) {
           if (j !== columns.dateCol && j !== columns.balanceCol) {
@@ -370,10 +309,7 @@ export const parseXLSX = async (file: File): Promise<ParseResult> => {
     const headers = (data[0] || []).map(h => String(h || ''));
     const columns = detectColumns(headers);
     
-    // Detect if this is a credit card statement
-    const isCreditCard = isCreditCardStatementXLSX(data, columns);
-    
-    console.log('XLSX Detected columns:', { headers, columns, isCreditCard });
+    console.log('XLSX Detected columns:', { headers, columns });
     
     const transactions: ParsedTransaction[] = [];
     
@@ -388,7 +324,6 @@ export const parseXLSX = async (file: File): Promise<ParseResult> => {
       if (!description) {
         for (let j = 0; j < row.length; j++) {
           if (j !== columns.dateCol && j !== columns.amountCol && 
-              j !== columns.debitCol && j !== columns.creditCol && 
               j !== columns.balanceCol) {
             const val = String(row[j] || '').trim();
             if (val && val.length > 3 && isNaN(parseFloat(val))) {
@@ -408,12 +343,11 @@ export const parseXLSX = async (file: File): Promise<ParseResult> => {
         if (typeDirection) direction = typeDirection;
       }
       
-      // Method 1: Single amount column
+      // Method 1: Single amount column - use sign directly
       if (columns.amountCol >= 0) {
         const rawAmount = parseAmount(row[columns.amountCol] as string | number);
         if (rawAmount !== null) {
-          // Determine direction based on sign
-          // Credit card statements: negative = purchase (debit), positive = payment/refund (credit)
+          // Derive direction purely from sign: negative = debit, positive = credit
           if (columns.typeCol < 0) {
             direction = rawAmount < 0 ? 'debit' : 'credit';
           }
@@ -421,21 +355,7 @@ export const parseXLSX = async (file: File): Promise<ParseResult> => {
         }
       }
       
-      // Method 2: Separate debit/credit columns
-      if (amount === null && (columns.debitCol >= 0 || columns.creditCol >= 0)) {
-        const debit = columns.debitCol >= 0 ? parseAmount(row[columns.debitCol] as string | number) : null;
-        const credit = columns.creditCol >= 0 ? parseAmount(row[columns.creditCol] as string | number) : null;
-        
-        if (debit !== null && debit !== 0) {
-          amount = Math.abs(debit);
-          direction = 'debit';
-        } else if (credit !== null && credit !== 0) {
-          amount = Math.abs(credit);
-          direction = 'credit';
-        }
-      }
-      
-      // Method 3: Fallback - try to find any numeric column
+      // Method 2: Fallback - try to find any numeric column
       if (amount === null) {
         for (let j = 0; j < row.length; j++) {
           if (j !== columns.dateCol && j !== columns.balanceCol) {
@@ -465,36 +385,6 @@ export const parseXLSX = async (file: File): Promise<ParseResult> => {
   }
 };
 
-// Detect credit card statement in XLSX format
-const isCreditCardStatementXLSX = (data: unknown[][], columns: ColumnMapping): boolean => {
-  // Check account type column for credit card indicators
-  if (columns.accountTypeCol >= 0) {
-    for (let i = 1; i < Math.min(data.length, 10); i++) {
-      const row = data[i] as (string | number | Date)[];
-      const accountType = String(row?.[columns.accountTypeCol] || '').toLowerCase();
-      if (accountType.includes('visa') || accountType.includes('mastercard') || 
-          accountType.includes('amex') || accountType.includes('credit') ||
-          accountType.includes('card')) {
-        return true;
-      }
-    }
-  }
-  
-  // Heuristic: if most amounts are negative, it's likely a credit card statement
-  let negativeCount = 0;
-  let positiveCount = 0;
-  
-  for (let i = 1; i < Math.min(data.length, 20); i++) {
-    const row = data[i] as (string | number | Date)[];
-    const amount = columns.amountCol >= 0 ? parseAmount(row?.[columns.amountCol] as string | number) : null;
-    if (amount !== null) {
-      if (amount < 0) negativeCount++;
-      else if (amount > 0) positiveCount++;
-    }
-  }
-  
-  return negativeCount > positiveCount * 2;
-};
 
 export const parseFile = async (file: File): Promise<ParseResult> => {
   const fileName = file.name.toLowerCase();
