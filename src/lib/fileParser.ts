@@ -136,7 +136,7 @@ const detectColumns = (headers: string[]): ColumnMapping => {
   const amountCol = findColumn(amountKeywords, ['debit', 'credit', 'balance', 'running']);
   
   // Separate debit/credit columns
-  const debitKeywords = ['debit', 'withdrawal', 'out', 'dr', 'expense', 'payment', 'spent'];
+  const debitKeywords = ['debit', 'withdrawal', 'out', 'dr', 'expense', 'spent'];
   const creditKeywords = ['credit', 'deposit', 'in', 'cr', 'income', 'received'];
   const debitCol = findColumn(debitKeywords);
   const creditCol = findColumn(creditKeywords, ['debit']); // Exclude debit to avoid matching same column
