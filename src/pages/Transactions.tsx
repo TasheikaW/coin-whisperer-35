@@ -16,7 +16,8 @@ import {
   Search,
   Filter,
   Download,
-  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   MoreHorizontal,
   ShoppingCart,
   Utensils,
@@ -71,6 +72,21 @@ export default function Transactions() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [showTransfers, setShowTransfers] = useState(true);
   
+  // Sorting state
+  type SortField = 'date' | 'description' | 'category' | 'source' | 'amount';
+  type SortDirection = 'asc' | 'desc';
+  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+  
   // State for save rule dialog
   const [saveRuleDialogOpen, setSaveRuleDialogOpen] = useState(false);
   const [pendingRuleData, setPendingRuleData] = useState<{
@@ -113,7 +129,7 @@ export default function Transactions() {
   };
 
   const filteredTransactions = useMemo(() => {
-    return transactions.filter((t) => {
+    const filtered = transactions.filter((t) => {
       if (!showTransfers && t.is_transfer) return false;
       if (categoryFilter !== "all" && t.categories?.name !== categoryFilter) return false;
       if (searchQuery) {
@@ -124,7 +140,40 @@ export default function Transactions() {
       }
       return true;
     });
-  }, [transactions, showTransfers, categoryFilter, searchQuery]);
+
+    // Sort the filtered results
+    return [...filtered].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortField) {
+        case 'date':
+          comparison = a.transaction_date.localeCompare(b.transaction_date);
+          break;
+        case 'description':
+          const descA = (a.merchant_normalized || a.description_raw).toLowerCase();
+          const descB = (b.merchant_normalized || b.description_raw).toLowerCase();
+          comparison = descA.localeCompare(descB);
+          break;
+        case 'category':
+          const catA = a.categories?.name || '';
+          const catB = b.categories?.name || '';
+          comparison = catA.localeCompare(catB);
+          break;
+        case 'source':
+          const srcA = a.uploads?.filename || '';
+          const srcB = b.uploads?.filename || '';
+          comparison = srcA.localeCompare(srcB);
+          break;
+        case 'amount':
+          const amtA = a.direction === 'credit' ? a.amount : -a.amount;
+          const amtB = b.direction === 'credit' ? b.amount : -b.amount;
+          comparison = amtA - amtB;
+          break;
+      }
+      
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [transactions, showTransfers, categoryFilter, searchQuery, sortField, sortDirection]);
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-US", {
@@ -242,14 +291,30 @@ export default function Transactions() {
                 <thead>
                   <tr>
                     <th>
-                      <Button variant="ghost" size="sm" className="h-auto p-0 font-medium text-xs uppercase">
-                        Date <ArrowUpDown size={14} className="ml-1" />
+                      <Button variant="ghost" size="sm" className="h-auto p-0 font-medium text-xs uppercase" onClick={() => handleSort('date')}>
+                        Date {sortField === 'date' ? (sortDirection === 'asc' ? <ArrowUp size={14} className="ml-1" /> : <ArrowDown size={14} className="ml-1" />) : <ArrowDown size={14} className="ml-1 opacity-30" />}
                       </Button>
                     </th>
-                    <th>Description</th>
-                    <th>Category</th>
-                    <th>Source</th>
-                    <th className="text-right">Amount</th>
+                    <th>
+                      <Button variant="ghost" size="sm" className="h-auto p-0 font-medium text-xs uppercase" onClick={() => handleSort('description')}>
+                        Description {sortField === 'description' ? (sortDirection === 'asc' ? <ArrowUp size={14} className="ml-1" /> : <ArrowDown size={14} className="ml-1" />) : <ArrowDown size={14} className="ml-1 opacity-30" />}
+                      </Button>
+                    </th>
+                    <th>
+                      <Button variant="ghost" size="sm" className="h-auto p-0 font-medium text-xs uppercase" onClick={() => handleSort('category')}>
+                        Category {sortField === 'category' ? (sortDirection === 'asc' ? <ArrowUp size={14} className="ml-1" /> : <ArrowDown size={14} className="ml-1" />) : <ArrowDown size={14} className="ml-1 opacity-30" />}
+                      </Button>
+                    </th>
+                    <th>
+                      <Button variant="ghost" size="sm" className="h-auto p-0 font-medium text-xs uppercase" onClick={() => handleSort('source')}>
+                        Source {sortField === 'source' ? (sortDirection === 'asc' ? <ArrowUp size={14} className="ml-1" /> : <ArrowDown size={14} className="ml-1" />) : <ArrowDown size={14} className="ml-1 opacity-30" />}
+                      </Button>
+                    </th>
+                    <th className="text-right">
+                      <Button variant="ghost" size="sm" className="h-auto p-0 font-medium text-xs uppercase" onClick={() => handleSort('amount')}>
+                        Amount {sortField === 'amount' ? (sortDirection === 'asc' ? <ArrowUp size={14} className="ml-1" /> : <ArrowDown size={14} className="ml-1" />) : <ArrowDown size={14} className="ml-1 opacity-30" />}
+                      </Button>
+                    </th>
                     <th></th>
                   </tr>
                 </thead>
