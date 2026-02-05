@@ -131,18 +131,18 @@ export function useUploads() {
 
     // Keyword mappings for auto-categorization
     const keywordMappings: Record<string, string[]> = {
-      groceries: ['grocery', 'supermarket', 'walmart', 'target', 'costco', 'kroger', 'safeway', 'trader joe', 'whole foods', 'aldi', 'publix', 'food lion'],
-      dining: ['restaurant', 'cafe', 'coffee', 'starbucks', 'mcdonalds', 'burger', 'pizza', 'chipotle', 'subway', 'wendys', 'taco bell', 'dunkin', 'grubhub', 'doordash', 'uber eats'],
-      transportation: ['uber', 'lyft', 'gas', 'fuel', 'shell', 'exxon', 'chevron', 'bp', 'parking', 'toll', 'transit', 'metro', 'bus'],
-      utilities: ['electric', 'power', 'water', 'gas bill', 'internet', 'comcast', 'verizon', 'att', 't-mobile', 'spectrum'],
-      entertainment: ['netflix', 'spotify', 'hulu', 'disney', 'amazon prime', 'movie', 'theater', 'concert', 'ticket', 'gaming', 'steam', 'playstation', 'xbox'],
-      shopping: ['amazon', 'ebay', 'etsy', 'best buy', 'apple store', 'mall', 'clothing', 'shoes', 'nike', 'adidas'],
-      health: ['pharmacy', 'cvs', 'walgreens', 'doctor', 'hospital', 'medical', 'dental', 'vision', 'gym', 'fitness'],
-      subscriptions: ['subscription', 'membership', 'monthly', 'annual fee', 'renewal'],
-      travel: ['airline', 'hotel', 'airbnb', 'booking', 'expedia', 'flight', 'travel', 'vacation'],
-      'rent/mortgage': ['rent', 'mortgage', 'lease', 'property'],
-      income: ['payroll', 'salary', 'direct deposit', 'wage', 'bonus', 'commission'],
-      transfer: ['transfer', 'xfer', 'tfr', 'zelle', 'venmo', 'paypal', 'cash app'],
+      groceries: ['grocery', 'supermarket', 'walmart', 'target', 'costco', 'kroger', 'safeway', 'trader joe', 'whole foods', 'aldi', 'publix', 'food lion', 'loblaws', 'sobeys', 'metro', 'no frills', 'freshco', 'save-on', 'superstore', 'real canadian', 'food basics', 'longos', 'farm boy'],
+      dining: ['restaurant', 'cafe', 'coffee', 'starbucks', 'mcdonalds', 'mcdonald', 'burger', 'pizza', 'chipotle', 'subway', 'wendys', 'taco bell', 'dunkin', 'grubhub', 'doordash', 'uber eats', 'skip the dishes', 'tim hortons', 'tims', 'a&w', 'kfc', 'popeyes', 'dairy queen', 'harveys', 'boston pizza', 'swiss chalet', 'montanas', 'earls', 'joeys', 'cactus club', 'milestones', 'the keg', 'red lobster', 'olive garden', 'applebees', 'chilis', 'ihop', 'dennys', 'panera', 'nandos', 'five guys', 'in-n-out', 'shake shack', 'panda express', 'chick-fil-a'],
+      transportation: ['uber', 'lyft', 'gas', 'fuel', 'shell', 'exxon', 'chevron', 'bp', 'parking', 'toll', 'transit', 'bus', 'petro', 'esso', 'husky', 'pioneer', 'canadian tire gas', 'presto', 'translink', 'ttc', 'octranspo', 'stm', 'go transit', 'impark', 'indigo parking'],
+      utilities: ['electric', 'power', 'water', 'gas bill', 'internet', 'comcast', 'verizon', 'att', 't-mobile', 'spectrum', 'telus', 'rogers', 'bell', 'shaw', 'fido', 'koodo', 'virgin mobile', 'freedom mobile', 'enmax', 'epcor', 'fortis', 'bc hydro', 'hydro one', 'hydro quebec', 'toronto hydro', 'alectra', 'atco'],
+      entertainment: ['netflix', 'spotify', 'hulu', 'disney', 'amazon prime', 'movie', 'theater', 'theatre', 'concert', 'ticket', 'gaming', 'steam', 'playstation', 'xbox', 'nintendo', 'cineplex', 'landmark cinema', 'apple music', 'youtube premium', 'crave', 'paramount+', 'hbo max', 'peacock', 'twitch'],
+      shopping: ['amazon', 'ebay', 'etsy', 'best buy', 'apple store', 'mall', 'clothing', 'shoes', 'nike', 'adidas', 'canadian tire', 'ikea', 'home depot', 'lowes', 'rona', 'home hardware', 'staples', 'the bay', 'hudson bay', 'winners', 'marshalls', 'homesense', 'dollarama', 'dollar tree', 'walmart', 'sephora', 'ulta', 'lululemon', 'gap', 'old navy', 'h&m', 'zara', 'uniqlo', 'nordstrom', 'simons', 'sportchek', 'atmosphere', 'marks', 'cabelas', 'bass pro', 'lee valley', 'michael', 'bed bath', 'wayfair', 'structube', 'the brick', 'leon'],
+      health: ['pharmacy', 'cvs', 'walgreens', 'doctor', 'hospital', 'medical', 'dental', 'vision', 'gym', 'fitness', 'shoppers drug', 'rexall', 'london drugs', 'pharmasave', 'jean coutu', 'goodlife', 'planet fitness', 'anytime fitness', 'ymca', 'ywca', 'la fitness', 'equinox', 'orangetheory', 'f45', 'crossfit', 'physio', 'chiro', 'massage', 'optometrist', 'clinic'],
+      subscriptions: ['subscription', 'membership', 'monthly', 'annual fee', 'renewal', 'prime member', 'costco member', 'amazon prime'],
+      travel: ['airline', 'hotel', 'airbnb', 'booking', 'expedia', 'flight', 'travel', 'vacation', 'air canada', 'westjet', 'porter', 'flair', 'swoop', 'united', 'delta', 'american airlines', 'southwest', 'marriott', 'hilton', 'hyatt', 'holiday inn', 'best western', 'fairmont', 'vrbo', 'hotels.com', 'trivago', 'kayak', 'hopper'],
+      'rent/mortgage': ['rent', 'mortgage', 'lease', 'property', 'landlord', 'tenant', 'condo fee', 'strata'],
+      income: ['payroll', 'salary', 'direct deposit', 'wage', 'bonus', 'commission', 'deposit', 'income', 'refund', 'cashback', 'reimbursement', 'etransfer in', 'e-transfer in'],
+      transfer: ['transfer', 'xfer', 'tfr', 'zelle', 'venmo', 'paypal', 'cash app', 'interac', 'e-transfer', 'etransfer', 'wire', 'eft'],
     };
 
     // Auto-categorize function
