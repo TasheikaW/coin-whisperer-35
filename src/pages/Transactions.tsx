@@ -77,7 +77,6 @@ export default function Transactions() {
         title: 'Category updated',
         description: 'Transaction category has been changed.',
       });
-      fetchTransactions();
     }
   };
 

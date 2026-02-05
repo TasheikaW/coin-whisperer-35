@@ -75,9 +75,26 @@ export function useTransactions() {
       return false;
     }
 
-    setTransactions(prev => 
-      prev.map(t => t.id === id ? { ...t, ...updates } : t)
-    );
+    // If updating category, fetch the category details to update the local state properly
+    if (updates.category_id) {
+      const { data: categoryData } = await supabase
+        .from('categories')
+        .select('name, icon, color')
+        .eq('id', updates.category_id)
+        .single();
+
+      setTransactions(prev => 
+        prev.map(t => t.id === id ? { 
+          ...t, 
+          ...updates, 
+          categories: categoryData || t.categories 
+        } : t)
+      );
+    } else {
+      setTransactions(prev => 
+        prev.map(t => t.id === id ? { ...t, ...updates } : t)
+      );
+    }
     return true;
   }, [toast]);
 
