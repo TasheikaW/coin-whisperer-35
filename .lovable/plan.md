@@ -1,94 +1,110 @@
 
 
-# Simplify Parser: Import Raw Amounts, Derive Direction from Sign
+# Add Category Rule Learning: Remember & Apply to Existing
 
-## Current Problem
+## Overview
 
-The parser has complex logic trying to detect debit/credit columns with keyword matching that causes false positives (e.g., "Description" matching "in" keyword). This leads to missed transactions.
+When you manually change a transaction's category, the system will:
+1. **Prompt** you to save this as a rule for the merchant
+2. **Apply** the category to all existing matching transactions
+3. **Remember** this for future uploads
 
-## New Approach: Keep It Simple
+## User Experience
 
-**Import the raw amount with its original sign, then derive direction purely from the sign:**
-- **Positive amount in file → `credit`**
-- **Negative amount in file → `debit`**
+After changing a category, a dialog appears:
 
-No keyword detection for debit/credit columns. No Method 2. Just find the amount column and use its sign.
-
-## Changes to `src/lib/fileParser.ts`
-
-### 1. Remove debit/credit column detection entirely
-
-**Lines 138-142**: Remove the debitKeywords, creditKeywords, and their column detection:
-
-```typescript
-// DELETE these lines:
-const debitKeywords = ['debit', 'withdrawal', 'out', 'dr', 'expense', 'spent'];
-const creditKeywords = ['credit', 'deposit', 'in', 'cr', 'income', 'received'];
-const debitCol = findColumn(debitKeywords);
-const creditCol = findColumn(creditKeywords, ['debit']);
+```
++-----------------------------------------+
+|  Remember this category?                |
+|                                         |
+|  Apply "Transportation" to all          |
+|  transactions from "HOPP"?              |
+|                                         |
+|  This will update 3 existing            |
+|  transactions and remember for          |
+|  future uploads.                        |
+|                                         |
+|  [No, just this one]  [Yes, apply all]  |
++-----------------------------------------+
 ```
 
-### 2. Simplify the returned columns object
+## Implementation
 
-**Lines 159-168**: Remove `debitCol` and `creditCol` from the return object:
+### 1. Create Save Rule Dialog Component
+
+**New file**: `src/components/transactions/SaveRuleDialog.tsx`
+
+A dialog component that:
+- Shows the merchant name and selected category
+- Displays count of existing transactions that will be updated
+- Offers "Just this one" or "Apply to all" options
+
+### 2. Add Hook for Category Rules
+
+**New file**: `src/hooks/useCategoryRules.ts`
+
+Functions to:
+- Save a new category rule to the database
+- Apply category to all matching transactions
+- Check for existing transactions that match the merchant
+
+### 3. Update Transactions Page
+
+**File**: `src/pages/Transactions.tsx`
+
+Changes:
+- After category change, show the SaveRuleDialog
+- Pass merchant name and category info to dialog
+- Handle dialog response (save rule + update matching transactions)
+
+### 4. Update Transactions Hook
+
+**File**: `src/hooks/useTransactions.ts`
+
+Add new function:
+- `updateMatchingTransactions(merchantPattern, categoryId)` - bulk update all transactions matching the pattern
+
+## Technical Details
+
+### Database Operations
+
+When user clicks "Yes, apply all":
 
 ```typescript
-return {
-  dateCol: dateCol >= 0 ? dateCol : 0,
-  descCol,
-  descCol2,
-  amountCol,
-  balanceCol,
-  typeCol,
-  accountTypeCol,
-};
+// 1. Save the rule
+await supabase.from('category_rules').insert({
+  user_id: user.id,
+  category_id: categoryId,
+  pattern: merchantNormalized.toLowerCase(),
+  pattern_type: 'merchant',
+  priority: 10  // User rules take priority
+});
+
+// 2. Update all matching transactions
+await supabase
+  .from('transactions')
+  .update({ category_id: categoryId })
+  .eq('user_id', user.id)
+  .ilike('merchant_normalized', `%${merchantNormalized}%`);
 ```
 
-### 3. Remove Method 2 (separate debit/credit columns) from parseCSV
+### Merchant Extraction
 
-**Lines 285-297**: Delete the entire Method 2 block that tries to read from separate debit/credit columns.
+Uses `merchant_normalized` from the transaction, or falls back to first 3 words of `description_raw`.
 
-### 4. Simplify Method 1 and Method 3 logic
+## Files Summary
 
-**Method 1 (lines 271-283)**: 
-```typescript
-// Method 1: Single amount column - use sign directly
-if (columns.amountCol >= 0) {
-  const rawAmount = parseAmount(values[columns.amountCol]);
-  if (rawAmount !== null) {
-    amount = rawAmount; // Keep original sign
-    direction = rawAmount < 0 ? 'debit' : 'credit';
-  }
-}
-```
-
-**Method 3 fallback (lines 299-311)**: Same simplification - just use the raw sign.
-
-### 5. Apply same changes to parseXLSX function
-
-Apply identical simplifications to the XLSX parsing logic.
-
-## Summary of Changes
-
-| Location | Change |
-|----------|--------|
-| Lines 138-142 | Remove debit/credit keyword lists and column detection |
-| Lines 159-168 | Remove debitCol/creditCol from returned columns object |
-| Lines 285-297 | Delete Method 2 entirely |
-| Method 1 & 3 | Use raw amount sign to determine direction |
-| parseXLSX | Apply same simplifications |
+| Action | File |
+|--------|------|
+| Create | `src/components/transactions/SaveRuleDialog.tsx` |
+| Create | `src/hooks/useCategoryRules.ts` |
+| Modify | `src/pages/Transactions.tsx` |
+| Modify | `src/hooks/useTransactions.ts` |
 
 ## Result
 
-After this change:
-- Parser only looks for: **date**, **description**, **amount** columns
-- Direction is determined purely by the sign in the file
-- `1750` (positive) → stored as `credit` → displays as `+$1,750`
-- `-183.46` (negative) → stored as `debit` → displays as `-$183.46`
-- No more false-positive keyword matching causing transactions to be skipped
-
-## After Implementation
-
-1. Delete existing transactions from the problematic upload
-2. Re-upload the file to verify all transactions import correctly
+After implementation:
+- Change "HOPP" to Transportation → Dialog asks to remember
+- Click "Yes, apply all" → Rule saved + all HOPP transactions updated
+- Upload new file next month → HOPP auto-categorized as Transportation
 
