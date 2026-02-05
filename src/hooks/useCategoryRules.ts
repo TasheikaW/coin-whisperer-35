@@ -5,15 +5,16 @@ import { useToast } from '@/hooks/use-toast';
 export function useCategoryRules() {
   const { toast } = useToast();
 
-  const countMatchingTransactions = useCallback(async (merchantPattern: string, excludeTransactionId?: string) => {
+  const countMatchingTransactions = useCallback(async (vendorPattern: string, excludeTransactionId?: string) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user || !merchantPattern) return 0;
+    if (!user || !vendorPattern) return 0;
 
+    // Use prefix matching to find all transactions starting with the vendor name
     let query = supabase
       .from('transactions')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id)
-      .ilike('merchant_normalized', `%${merchantPattern}%`);
+      .ilike('merchant_normalized', `${vendorPattern}%`);
 
     if (excludeTransactionId) {
       query = query.neq('id', excludeTransactionId);
@@ -24,7 +25,7 @@ export function useCategoryRules() {
   }, []);
 
   const saveRuleAndApplyToAll = useCallback(async (
-    merchantPattern: string,
+    vendorPattern: string,
     categoryId: string,
     categoryName: string
   ): Promise<{ success: boolean; updatedCount: number }> => {
@@ -34,12 +35,12 @@ export function useCategoryRules() {
     }
 
     try {
-      // Check if rule already exists for this pattern
+      // Check if rule already exists for this vendor pattern
       const { data: existingRule } = await supabase
         .from('category_rules')
         .select('id')
         .eq('user_id', user.id)
-        .ilike('pattern', merchantPattern.toLowerCase())
+        .ilike('pattern', vendorPattern.toLowerCase())
         .single();
 
       if (existingRule) {
@@ -51,13 +52,13 @@ export function useCategoryRules() {
 
         if (updateError) throw updateError;
       } else {
-        // Insert new rule
+        // Insert new rule with vendor pattern
         const { error: insertError } = await supabase
           .from('category_rules')
           .insert({
             user_id: user.id,
             category_id: categoryId,
-            pattern: merchantPattern.toLowerCase(),
+            pattern: vendorPattern.toLowerCase(),
             pattern_type: 'merchant',
             priority: 10,
           });
@@ -65,12 +66,12 @@ export function useCategoryRules() {
         if (insertError) throw insertError;
       }
 
-      // Update all matching transactions
+      // Update all matching transactions using prefix matching
       const { data: updatedTransactions, error: updateError } = await supabase
         .from('transactions')
         .update({ category_id: categoryId })
         .eq('user_id', user.id)
-        .ilike('merchant_normalized', `%${merchantPattern}%`)
+        .ilike('merchant_normalized', `${vendorPattern}%`)
         .select('id');
 
       if (updateError) throw updateError;
