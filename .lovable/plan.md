@@ -1,145 +1,128 @@
 
 
-# Fix PDF Parser: False Split Detection and Balance Column Leakage
+# Find Table Headers First, Then Extract Transactions Below
 
-## Root Cause
+## What This Solves
 
-Three issues prevent this Scotiabank PDF from parsing:
+Right now the parser processes **every line** in the PDF and tries to determine if it's a transaction. This causes it to pick up junk from the preamble (account info, addresses, legal text) and miss the actual transaction table structure.
 
-1. The section title "Transactions ( Withdrawals & Deposits )" is incorrectly detected as column headers because PDF.js splits it into short segments like "Withdrawals" and "Deposits" that match debit/credit keywords. This falsely activates split-column mode, which then skips every transaction because no amounts fall in the expected column ranges.
+Your Scotiabank PDF has a clear structure:
+- A section title: "Transactions ( Withdrawals & Deposits ) - 629034"
+- A **table header row**: "Transaction Date | Description | Amount | Balance"
+- A **sub-header row**: "CREDIT | DEBIT" (under the Amount column)
+- Then the actual transaction rows
 
-2. Even after fixing the false split detection, the parser would grab Balance column values as transaction amounts. In single-column mode, `extractAmount()` matches the LAST number on the line (the balance), not the transaction amount with the `+/-` suffix.
+The fix: scan each page for the table header row first, then **only parse lines below it**. This also naturally gives us column positions for Amount vs Balance.
 
-3. `extractAllAmounts()` strips the `+/-` sign from amounts, losing debit/credit direction information needed for column-aware extraction in single mode.
+---
 
 ## Changes
 
-### 1. Skip title/section header lines in column detection
+### 1. Add Table Header Detection
 
 **File: `src/lib/pdf/columnDetector.ts`**
 
-In `detectColumnLayout()`, skip lines whose text contains parentheses (e.g., "Transactions ( Withdrawals & Deposits )"). Real table column headers virtually never use parentheses around keywords, so this safely filters out section titles.
+Add a new function `findTableHeaderLine()` that scans through lines looking for a row containing table header keywords:
 
-### 2. Preserve sign info in extractAllAmounts
+- **Date keywords**: "transaction date", "trans date", "date", "posting date", "value date"
+- **Description keywords**: "description", "details", "particulars", "narrative"
 
-**File: `src/lib/pdf/amountParser.ts`**
+A line is considered a table header if it contains **at least one date keyword AND one description keyword**. This is very specific and won't match random text.
 
-Update `PositionedAmount` to include an optional `sign` field (`'+' | '-'`). Before stripping the text, check if the raw segment ends with `+` or `-` and preserve that info.
+When found, it also:
+- Records the **line index** where the header was found
+- Scans the next 1-2 lines for sub-headers (CREDIT/DEBIT under Amount)
+- Records column positions (Amount, Balance, Credit, Debit) from both the header and sub-header rows
+- Returns the index of the **first line after all headers** (so the parser knows where to start)
 
-### 3. Enable column-aware extraction in single mode
+### 2. Update Column Layout to Include Start Line
+
+**File: `src/lib/pdf/columnDetector.ts`**
+
+Extend `ColumnLayout` to include:
+- `tableStartLine`: the line index where transactions begin (right after the header rows)
+- `headerPageIndex`: which page the header was found on
+
+Update `detectGlobalColumnLayout()` to use `findTableHeaderLine()` on each page and return the enriched layout.
+
+### 3. Update Parser to Start After Headers
 
 **File: `src/lib/pdf/parser.ts`**
 
-Currently `tryColumnAwareExtraction()` only works when mode is `'split'`. Update it to also work in single mode when a balance column has been detected:
+Update the main parsing loop:
+- On the page where the header was found: skip all lines before `tableStartLine`
+- On pages **after** the header page: start from line 0 (transactions continue)
+- On pages **before** the header page: skip entirely (preamble)
+- If no header was found on any page: fall back to existing behaviour (parse all lines) for backwards compatibility with other statement formats
 
-- Get all amounts with positions
-- Filter out amounts in the balance column range
-- Use the first remaining amount
-- Use preserved sign info for direction ('+' = credit, '-' = debit)
-- Fall back to keyword-based direction detection if no sign info
-
-This prevents the balance value from ever being used as the transaction amount.
+Also add **end-of-table detection**: stop parsing when hitting lines like "CLOSING BALANCE", "OPENING BALANCE" at the end, or similar summary markers.
 
 ---
 
 ## Technical Details
 
-### `src/lib/pdf/columnDetector.ts`
-
-Add a line-level check at the start of the scanning loop:
+### New Function: `findTableHeaderLine()`
 
 ```text
-for (const line of linesToScan) {
-  // NEW: Skip lines with parentheses - these are section titles, not headers
-  if (/\(.*\)/.test(line.text)) continue;
-  // ... rest of existing detection
-}
-```
-
-### `src/lib/pdf/amountParser.ts`
-
-Extend PositionedAmount:
-
-```text
-export interface PositionedAmount {
-  amount: number;
-  x: number;
-  sign?: '+' | '-';  // NEW: preserved from suffix
-}
-```
-
-In `extractAllAmounts()`, detect sign before stripping:
-
-```text
-const trimText = text.trim();
-let sign: '+' | '-' | undefined;
-if (trimText.endsWith('+')) sign = '+';
-else if (trimText.endsWith('-')) sign = '-';
-// ... existing parsing ...
-results.push({ amount, x: seg.x, sign });
-```
-
-### `src/lib/pdf/parser.ts`
-
-Update `tryColumnAwareExtraction()` to handle single mode:
-
-```text
-function tryColumnAwareExtraction(structuredLine, layout) {
-  // NEW: Also work in single mode when balance column is detected
-  if (layout.mode !== 'split' && !layout.balanceX) return null;
-
-  const amounts = extractAllAmounts(structuredLine.segments);
-  if (amounts.length === 0) return null;
-
-  if (layout.mode === 'split') {
-    // Existing split mode logic (unchanged)
-    ...
-  } else {
-    // Single mode with balance column knowledge
-    // Filter out balance column amounts
-    const filtered = amounts.filter(a => !isInRange(a.x, layout.balanceX));
-    if (filtered.length === 0) return null;
-
-    // Use the first non-balance amount
-    const main = filtered[0];
-
-    // Use preserved sign for direction
-    let direction: 'debit' | 'credit' = 'debit';
-    if (main.sign === '+') direction = 'credit';
-    else if (main.sign === '-') direction = 'debit';
-
-    // Build description from non-amount, non-balance segments
-    ...
-    return { amount: main.amount, direction, description };
-  }
-}
-```
-
-Update the main parse loop to also try column-aware extraction in single mode (when balance column is known):
-
-```text
-// Try column-aware extraction (works for both split AND single-with-balance)
-const colResult = tryColumnAwareExtraction(structuredLine, globalLayout);
-if (colResult && colResult.amount > 0) {
-  // ... add transaction
-  continue;
+Input: StructuredLine[] (all lines on a page)
+Output: {
+  headerLineIndex: number,       -- where the header row is (-1 if not found)
+  tableStartLine: number,        -- first line after all header/sub-header rows
+  layout: ColumnLayout           -- column positions extracted from headers
 }
 
-// If split mode and column-aware failed, skip (don't guess)
-if (globalLayout.mode === 'split') continue;
-
-// Fall through to Strategy 2 only if no column info available
+Logic:
+  For each line:
+    1. Check segments for date keywords ("transaction date", "date", etc.)
+    2. Check segments for description keywords ("description", "details", etc.)
+    3. If BOTH found on the same line -> this is the table header
+    4. Record positions of "Amount", "Balance" from this line
+    5. Scan next 1-2 lines for "CREDIT"/"DEBIT" sub-headers
+    6. If sub-headers found -> split mode, record their positions
+    7. tableStartLine = last header/sub-header line index + 1
 ```
+
+### Updated Main Parse Loop
+
+```text
+Before (current):
+  for each page:
+    for each line on page:
+      try to parse as transaction...
+
+After (new):
+  globalLayout = detectGlobalColumnLayout(pages)  -- now includes header info
+  
+  for each page (index p):
+    if p < headerPageIndex: skip entire page
+    if p == headerPageIndex: start from tableStartLine
+    if p > headerPageIndex: start from line 0
+    
+    for each line (starting from determined start):
+      if line matches end-of-table marker: stop
+      try to parse as transaction...
+```
+
+### End-of-Table Markers
+
+Lines that signal the end of the transaction table:
+- "CLOSING BALANCE"
+- "TOTAL DEBITS"
+- "TOTAL CREDITS"
+- Lines that are just a balance amount with no date/description
 
 ### Files Changed
 
 | File | Change |
 |------|--------|
-| `src/lib/pdf/columnDetector.ts` | Skip parenthetical lines in column detection |
-| `src/lib/pdf/amountParser.ts` | Preserve sign info in PositionedAmount |
-| `src/lib/pdf/parser.ts` | Enable column-aware extraction in single mode with balance filtering |
+| `src/lib/pdf/columnDetector.ts` | Add `findTableHeaderLine()`, extend `ColumnLayout` with start-line info, update global detection |
+| `src/lib/pdf/parser.ts` | Use header-based start line, add end-of-table detection |
 
-### No database changes required
+### Backwards Compatibility
+
+If no table header is found in the PDF (e.g., some credit card statements don't have a clear header row), the parser falls back to its current behaviour of scanning all lines. This ensures other statement formats continue to work.
+
+### No database or backend changes required
 
 All changes are in client-side parsing logic only.
 
