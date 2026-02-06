@@ -104,8 +104,6 @@ interface ColumnMapping {
   dateCol: number;
   descCol: number;
   amountCol: number;
-  debitCol: number;
-  creditCol: number;
   balanceCol: number;
   typeCol: number;
   accountTypeCol: number;
@@ -136,10 +134,6 @@ const detectColumns = (headers: string[]): ColumnMapping => {
   const amountKeywords = ['amount', 'sum', 'value', 'total', 'cad$', 'usd$', 'cad', 'usd', 'eur', 'gbp', 'aud', 'money', 'price'];
   const amountCol = findColumn(amountKeywords, ['debit', 'credit', 'balance', 'running']);
   
-  // Separate debit/credit columns
-  const debitCol = findColumn(['debit', 'withdrawal', 'withdrawals', 'charges', 'purchases'], ['balance']);
-  const creditCol = findColumn(['credit', 'deposit', 'deposits', 'payments'], ['balance', 'limit', 'available']);
-  
   // Balance column (to exclude from amount detection)
   const balanceCol = findColumn(['balance', 'running', 'available']);
   
@@ -159,8 +153,6 @@ const detectColumns = (headers: string[]): ColumnMapping => {
     dateCol: dateCol >= 0 ? dateCol : 0,
     descCol: descCol >= 0 ? descCol : 1,
     amountCol,
-    debitCol,
-    creditCol,
     balanceCol,
     typeCol,
     accountTypeCol,
@@ -244,25 +236,7 @@ export const parseCSV = async (file: File): Promise<ParseResult> => {
         }
       }
       
-      // Method 2: Separate debit/credit columns - merge into single amount
-      if (amount === null && (columns.debitCol >= 0 || columns.creditCol >= 0)) {
-        if (columns.debitCol >= 0) {
-          const debitAmount = parseAmount(values[columns.debitCol]);
-          if (debitAmount !== null && debitAmount !== 0) {
-            amount = Math.abs(debitAmount);
-            direction = 'debit';
-          }
-        }
-        if (amount === null && columns.creditCol >= 0) {
-          const creditAmount = parseAmount(values[columns.creditCol]);
-          if (creditAmount !== null && creditAmount !== 0) {
-            amount = Math.abs(creditAmount);
-            direction = 'credit';
-          }
-        }
-      }
-      
-      // Method 3: Fallback - try to find any numeric column
+      // Method 2: Fallback - try to find any numeric column
       if (amount === null) {
         for (let j = 0; j < values.length; j++) {
           if (j !== columns.dateCol && j !== columns.balanceCol) {
@@ -382,25 +356,7 @@ export const parseXLSX = async (file: File): Promise<ParseResult> => {
         }
       }
       
-      // Method 2: Separate debit/credit columns - merge into single amount
-      if (amount === null && (columns.debitCol >= 0 || columns.creditCol >= 0)) {
-        if (columns.debitCol >= 0) {
-          const debitAmount = parseAmount(row[columns.debitCol] as string | number);
-          if (debitAmount !== null && debitAmount !== 0) {
-            amount = Math.abs(debitAmount);
-            direction = 'debit';
-          }
-        }
-        if (amount === null && columns.creditCol >= 0) {
-          const creditAmount = parseAmount(row[columns.creditCol] as string | number);
-          if (creditAmount !== null && creditAmount !== 0) {
-            amount = Math.abs(creditAmount);
-            direction = 'credit';
-          }
-        }
-      }
-      
-      // Method 3: Fallback - try to find any numeric column
+      // Method 2: Fallback - try to find any numeric column
       if (amount === null) {
         for (let j = 0; j < row.length; j++) {
           if (j !== columns.dateCol && j !== columns.balanceCol) {
