@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUploads } from "@/hooks/useUploads";
-import { TransactionPreviewDialog } from "@/components/uploads/TransactionPreviewDialog";
 
 const FileIcon = ({ type }: { type: string }) => {
   if (type === "csv" || type === "xlsx") {
@@ -57,14 +56,10 @@ export default function Uploads() {
     stagedFiles,
     isLoading,
     isUploading,
-    isParsing,
-    previewData,
     fetchUploads,
     addStagedFiles,
     removeStagedFile,
     processUpload,
-    confirmImport,
-    cancelPreview,
     deleteUpload,
     viewUploadTransactions,
   } = useUploads();
@@ -151,18 +146,13 @@ export default function Uploads() {
               </CardTitle>
               <Button 
                 onClick={processUpload} 
-                disabled={isUploading || isParsing}
+                disabled={isUploading}
                 className="gap-2"
               >
-                {isParsing ? (
+                {isUploading ? (
                   <>
                     <Loader2 size={18} className="animate-spin" />
-                    Parsing...
-                  </>
-                ) : isUploading ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" />
-                    Importing...
+                    Processing...
                   </>
                 ) : (
                   <>
@@ -277,21 +267,6 @@ export default function Uploads() {
           )}
         </CardContent>
       </Card>
-
-      {/* Transaction Preview Dialog */}
-      {previewData && (
-        <TransactionPreviewDialog
-          open={!!previewData}
-          onOpenChange={(open) => {
-            if (!open) cancelPreview();
-          }}
-          transactions={previewData.transactions}
-          metadata={previewData.metadata}
-          fileName={previewData.fileName}
-          onConfirm={confirmImport}
-          isImporting={isUploading}
-        />
-      )}
     </AppLayout>
   );
 }
