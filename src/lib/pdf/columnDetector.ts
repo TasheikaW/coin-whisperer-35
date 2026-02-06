@@ -27,9 +27,12 @@ const BALANCE_KEYWORDS = ['balance', 'running balance', 'running bal'];
 
 /**
  * Check if a text segment matches any keyword from a list.
+ * Only considers short segments (< 30 chars) — long phrases like
+ * "Transactions ( Withdrawals & Deposits )" are titles, not column headers.
  */
 function matchesKeywords(text: string, keywords: string[]): boolean {
   const lower = text.toLowerCase().trim();
+  if (lower.length > 30) return false; // Too long to be a column header
   return keywords.some(kw => lower === kw || lower.includes(kw));
 }
 
