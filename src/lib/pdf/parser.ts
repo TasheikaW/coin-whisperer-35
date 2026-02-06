@@ -77,33 +77,55 @@ function tryColumnAwareExtraction(
   structuredLine: StructuredLine,
   layout: ColumnLayout,
 ): { amount: number; direction: 'debit' | 'credit'; description: string } | null {
-  if (layout.mode !== 'split') return null;
+  // Work in split mode OR single mode when a balance column is detected
+  if (layout.mode !== 'split' && !layout.balanceX) return null;
 
   const amounts = extractAllAmounts(structuredLine.segments);
   if (amounts.length === 0) return null;
 
-  const result = assignAmountFromColumns(amounts, layout);
-  if (!result || result.amount <= 0) return null;
+  let resultAmount: number | null = null;
+  let resultDirection: 'debit' | 'credit' = 'debit';
+
+  if (layout.mode === 'split') {
+    // Split mode: use column assignment
+    const result = assignAmountFromColumns(amounts, layout);
+    if (!result || result.amount <= 0) return null;
+    resultAmount = result.amount;
+    resultDirection = result.direction;
+  } else {
+    // Single mode with balance column knowledge:
+    // Filter out amounts in the balance column range
+    const inRange = (x: number, r: { min: number; max: number }) => x >= r.min && x <= r.max;
+    const filtered = amounts.filter(a => !(layout.balanceX && inRange(a.x, layout.balanceX)));
+    if (filtered.length === 0) return null;
+
+    // Use the first non-balance amount
+    const main = filtered[0];
+    resultAmount = main.amount;
+
+    // Use preserved sign for direction
+    if (main.sign === '+') resultDirection = 'credit';
+    else if (main.sign === '-') resultDirection = 'debit';
+    // else: default 'debit' stays
+  }
+
+  if (!resultAmount || resultAmount <= 0) return null;
 
   // Build description only from segments NOT in any amount column
   const amountXPositions = new Set(amounts.map(a => a.x));
   const descSegments = structuredLine.segments.filter(seg => {
-    // Skip segments that were detected as amounts
     if (amountXPositions.has(seg.x)) return false;
-    // Skip segments in the balance column
     if (isInAmountColumn(seg.x, layout)) return false;
-    // Skip segments that look like amounts
     if (AMOUNT_TEXT_RE.test(seg.text.trim())) return false;
     return true;
   });
 
   const rawDesc = descSegments.map(s => s.text).join(' ').trim();
-  // Strip currency prefixes from description
   const description = rawDesc.replace(CURRENCY_PREFIX_RE, '').trim();
 
   return {
-    amount: result.amount,
-    direction: result.direction,
+    amount: resultAmount,
+    direction: resultDirection,
     description,
   };
 }
@@ -152,49 +174,46 @@ export async function parsePdf(file: File): Promise<PdfParseResult> {
 
         const { date, remainingText } = parsed;
 
-        // ── Strategy 1: Column-aware extraction for split debit/credit ──
-        if (globalLayout.mode === 'split') {
-          const colResult = tryColumnAwareExtraction(structuredLine, globalLayout);
-          if (colResult && colResult.amount > 0) {
-            // Build description: prefer date-parsed text (strips dates) but fall back to column-aware
-            const descFromText = cleanDescription(remainingText.replace(/[\d,]+\.\d{2}/g, '').trim());
-            const description = descFromText.length > 2 ? descFromText : cleanDescription(colResult.description);
+        // ── Strategy 1: Column-aware extraction (split mode OR single with balance column) ──
+        const colResult = tryColumnAwareExtraction(structuredLine, globalLayout);
+        if (colResult && colResult.amount > 0) {
+          // Build description: prefer date-parsed text (strips dates) but fall back to column-aware
+          const descFromText = cleanDescription(remainingText.replace(/[\d,]+\.\d{2}/g, '').trim());
+          const description = descFromText.length > 2 ? descFromText : cleanDescription(colResult.description);
 
-            if (description.length > 1) {
-              // Gather continuation lines
-              const descParts = [description];
-              let j = i + 1;
-              while (j < lines.length) {
-                const nextLine = lines[j].text.trim();
-                if (!nextLine || shouldSkipLine(nextLine)) { j++; continue; }
-                const strippedNext = stripReferencePrefix(nextLine);
-                if (parseDateFromLine(strippedNext, contextYear)) break;
-                if (extractAllAmounts(lines[j].segments).length > 0) break;
-                descParts.push(nextLine);
-                j++;
-              }
-
-              const fullDesc = descParts.join(' — ');
-              const dedupeKey = `${date}|${colResult.amount}|${fullDesc.slice(0, 20)}`;
-
-              if (!seenTransactions.has(dedupeKey)) {
-                seenTransactions.add(dedupeKey);
-                transactions.push({
-                  date,
-                  description: fullDesc,
-                  amount: colResult.amount,
-                  direction: colResult.direction,
-                });
-              }
-              i = j - 1;
-              continue;
+          if (description.length > 1) {
+            // Gather continuation lines
+            const descParts = [description];
+            let j = i + 1;
+            while (j < lines.length) {
+              const nextLine = lines[j].text.trim();
+              if (!nextLine || shouldSkipLine(nextLine)) { j++; continue; }
+              const strippedNext = stripReferencePrefix(nextLine);
+              if (parseDateFromLine(strippedNext, contextYear)) break;
+              if (extractAllAmounts(lines[j].segments).length > 0) break;
+              descParts.push(nextLine);
+              j++;
             }
-          }
 
-          // In split mode, if column-aware extraction fails (no amount in debit/credit column),
-          // skip the line rather than falling through to sign-based guessing
-          continue;
+            const fullDesc = descParts.join(' — ');
+            const dedupeKey = `${date}|${colResult.amount}|${fullDesc.slice(0, 20)}`;
+
+            if (!seenTransactions.has(dedupeKey)) {
+              seenTransactions.add(dedupeKey);
+              transactions.push({
+                date,
+                description: fullDesc,
+                amount: colResult.amount,
+                direction: colResult.direction,
+              });
+            }
+            i = j - 1;
+            continue;
+          }
         }
+
+        // If split mode and column-aware extraction failed, skip (don't guess)
+        if (globalLayout.mode === 'split') continue;
 
         // ── Strategy 2: Single-column / sign-based extraction (existing logic) ──
         let amountResult = extractAmount(remainingText);
