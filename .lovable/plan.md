@@ -1,136 +1,136 @@
 
 
-# Robust Universal PDF Statement Parser
+# Merge Debit/Credit Columns and Improve Column-Aware PDF Parsing
 
-## Problem
-The current PDF parser only handles a few specific date and amount formats. It fails on common real-world statements including:
-- Scotiabank (Jamaica): `15JUL` dates, `J$ 23,000.00 +` amounts
-- Generic credit cards: reference numbers before dates, `$-5,145.78` amounts
-- American Express: dates with asterisks (`01/20/06*`)
-- Various multi-line transaction layouts
+## What This Solves
 
-## Solution
-Rewrite `src/lib/pdfParser.ts` with a multi-strategy parser that tries different extraction approaches and picks the one that yields the most transactions.
+Currently, the PDF parser processes text line-by-line and looks for a single amount at the end of each line. This fails when a PDF statement uses **separate Debit and Credit columns** (a common layout in bank statements), because:
+
+- Two amounts may appear on the same line (one in the Debit column, one in the Credit column)
+- A Balance column amount may also appear, and the parser can't distinguish it from the transaction amount
+- The parser doesn't know which column an amount belongs to, so it may pick the wrong one
+
+The fix: make the PDF text extractor **column-aware** so the parser can detect column headers (Debit, Credit, Amount, Balance) and correctly assign amounts based on their position.
+
+This also applies to the CSV/XLSX parser, which currently has no support for separate Debit/Credit columns either.
 
 ---
 
 ## Changes
 
-### 1. Expand Date Parsing (pdfParser.ts)
+### 1. Enhance PDF Text Extractor with Column Position Data
 
-Add support for these additional date formats the current parser misses:
+**File: `src/lib/pdf/textExtractor.ts`**
 
-| Format | Example | Source |
-|--------|---------|--------|
-| DDMMM (no separator) | `15JUL`, `05AUG` | Scotiabank |
-| DDMMMYY | `05JUL24`, `01AUG24` | Scotiabank period |
-| DD Mon YYYY | `27 Apr 2018` | Australian statements |
-| MM/DD/YY with asterisk | `01/20/06*` | Amex |
-| MM/DD (2-digit short) | `10/08`, `1/25` | Credit card samples |
+- Add a new `StructuredLine` type that includes text segments with their X positions (not just flattened strings)
+- Add a new export function `extractStructuredTextFromPdf()` that returns both plain text lines and the structured data with X positions
+- The parser can then determine which column an amount falls under
 
-### 2. Expand Amount Extraction (pdfParser.ts)
+### 2. Add Column Header Detection to PDF Parser
 
-Add support for these amount formats:
+**File: `src/lib/pdf/parser.ts`** (new helper + main parse loop changes)
 
-| Format | Example | Source |
-|--------|---------|--------|
-| Currency prefix + suffix sign | `J$ 23,000.00 +` / `J$ 5,000.00 -` | Scotiabank |
-| Dollar-negative prefix | `$-5,145.78` | Amex |
-| Negative without dollar | `-168.80` | Credit card sample |
-| Large amounts (remove 1M cap) | `J$ 23,000.00` | Jamaican dollar amounts |
-| Multiple currency prefixes | `J$`, `A$`, `C$` | International statements |
+- Before processing transaction lines, scan for header rows that contain column labels like "Debit", "Credit", "Withdrawal", "Deposit", "Amount", "Balance", "Charges", "Credits"
+- Record the X-position ranges of each detected column header
+- Create a `ColumnLayout` object: `{ debitRange, creditRange, amountRange, balanceRange }`
+- If separate Debit/Credit columns are detected, switch to column-aware mode
 
-### 3. Handle Multi-Line Transactions (pdfParser.ts)
+### 3. Column-Aware Amount Extraction
 
-The Scotiabank statement has a consistent pattern:
-```text
-15JUL    THIRD PARTY TRANSFER            J$ 23,000.00 +
-         Transfer from DARREN CHAMBERS 9859
-```
+**File: `src/lib/pdf/amountParser.ts`**
 
-Improve the multi-line handler to:
-- After parsing a transaction, check if the next line starts with whitespace or has no date -- if so, append it to the description
-- Continue gathering continuation lines until a new dated line is found
+- Add a new function `extractAllAmounts(text, segments)` that finds ALL amounts on a line along with their X positions
+- The parser uses this with the column layout to:
+  - Pick the amount from the Debit or Credit column (whichever has a value)
+  - Set direction based on which column it came from (Debit column = debit, Credit column = credit)
+  - Ignore amounts in the Balance column
 
-### 4. Handle Reference-Number-Prefixed Lines (pdfParser.ts)
+### 4. Update Parser Main Loop
 
-The credit card sample (page 2) has lines like:
-```text
-483GE7382  1/25        PAYMENT THANK YOU          -168.80
-32F349ER3  1/12  1/15  RECORD RECYCLER ANYTOWN    14.83
-```
+**File: `src/lib/pdf/parser.ts`**
 
-Add logic to strip leading reference/alphanumeric codes before attempting date parsing.
+The main parsing loop will be updated:
 
-### 5. Add More Skip Patterns (pdfParser.ts)
+- Phase 1: Extract structured text with positions
+- Phase 2: Detect column layout from headers
+- Phase 3: For each transaction line:
+  - If column-aware mode (separate Debit/Credit columns detected):
+    - Find all amounts and their X positions
+    - Match each amount to a column header
+    - Use the Debit or Credit column amount as the transaction amount
+    - Direction comes from which column
+  - If single-column mode (Amount column or +/- suffix):
+    - Use existing logic (unchanged)
 
-Add patterns to filter out:
-- `OPENING BALANCE`, `CLOSING BALANCE` lines
-- `STAMP DUTY`, `WITHHOLDING TAX`, `GCT/GOVT TAX` (government fees shown as separate line items that are already included in the service charge)
-- `SERVICE CHARGE DETAILS` section headers
-- `FINANCE CHARGE SUMMARY`, `Rate Information` sections
-- `Payment Coupon`, `Payment Address` sections
-- Lines that are just reference numbers or codes
+### 5. Add Debit/Credit Column Support to CSV/XLSX Parser
 
-### 6. Improve Credit/Debit Detection (pdfParser.ts)
+**File: `src/lib/fileParser.ts`**
 
-Update direction detection to handle:
-- `+` suffix = credit (deposit), `-` suffix = debit (withdrawal) -- used by Scotiabank
-- Negative amount values = credit (payment) in credit card context
-- Add keywords: `THIRD PARTY TRANSFER`, `THIRD PARTY TRF`, `MOBILE OB TRF`, `PREPAID VOUCHER`, `POS PURCHASE`, `PC-BILL PAYMENT`, `INTEREST PAYMENT`
-
-### 7. Improve Metadata Extraction (pdfParser.ts)
-
-Enhance to handle:
-- Scotiabank period format: `05JUL24 to 05AUG24`
-- Statement date format: `2/13/09` or `11/06/08`
-- Account number without masking: `629034`
-- Currency detection from `J$` prefix to set appropriate currency
-
-### 8. Pass Currency to Upload Hook (useUploads.ts)
-
-Update the transaction insert to use detected currency from PDF metadata instead of hardcoding `'USD'`. The `PdfParseResult` already has metadata; extend `ParseResult` to optionally carry currency info so the upload hook can use it.
+- Add `debitCol` and `creditCol` to the `ColumnMapping` interface
+- Update `detectColumns()` to find columns named "debit", "withdrawal", "charges" and "credit", "deposit", "payments"
+- In `parseCSV()` and `parseXLSX()`, when separate debit/credit columns are found:
+  - Check both columns for a value
+  - Use whichever has a non-zero value as the amount
+  - Set direction based on which column it came from
+  - This makes CSV/XLSX handling consistent with the new PDF logic
 
 ---
 
 ## Technical Details
 
-### File Changes
-
-**`src/lib/pdfParser.ts`** -- Major rewrite of parsing logic:
-- `parseDateFromLine()`: Add 5 new date format patterns (DDMMM, DDMMMYY, DD Mon YYYY, MM/DD/YY*, strip asterisks)
-- `extractAmount()`: Add patterns for currency-prefix+suffix-sign, dollar-negative, raise amount cap to 100M for foreign currencies
-- `shouldSkipLine()`: Add ~10 new skip patterns for balance lines, tax lines, section headers
-- New `stripReferencePrefix()` function to remove leading alphanumeric codes
-- Improve multi-line transaction gathering in the main parse loop
-- Add `detectCurrency()` function to identify J$, A$, C$, USD etc.
-- Expand `CREDIT_KEYWORDS` and `DEBIT_KEYWORDS` lists
-
-**`src/lib/fileParser.ts`** -- Minor update:
-- Add optional `currency` field to `ParseResult` interface
-- Pass through currency from PDF parser
-
-**`src/hooks/useUploads.ts`** -- Minor update:
-- Use `parseResult.currency` when available instead of hardcoded `'USD'`
-
-### Parsing Strategy
-
-The main parse loop will be enhanced with this flow:
+### New Types
 
 ```text
-For each line:
-  1. Skip if matches skip patterns
-  2. Strip reference number prefix (if any)
-  3. Try to parse date from start of line
-  4. If no date found, skip line
-  5. Check for posting date after transaction date
-  6. Extract amount (try all patterns)
-  7. If no amount, try combining with next line(s)
-  8. Gather continuation lines (no-date lines following)
-  9. Clean description, detect direction
-  10. Deduplicate and add to results
+StructuredLine {
+  text: string              -- full line text (same as before)
+  segments: Array<{
+    text: string
+    x: number               -- X position in PDF coordinates
+    width: number            -- approximate width
+  }>
+}
+
+ColumnLayout {
+  mode: 'single' | 'split'  -- single Amount vs separate Debit/Credit
+  debitX?: { min, max }
+  creditX?: { min, max }
+  amountX?: { min, max }
+  balanceX?: { min, max }
+}
 ```
 
-### No Database or Schema Changes Required
-All changes are purely in the client-side parsing logic.
+### Column Detection Logic
+
+```text
+For each line in the first 30 lines of each page:
+  1. Check if line contains column header keywords
+  2. If "debit"/"withdrawal" AND "credit"/"deposit" found at different X positions:
+     -> mode = 'split', record their X ranges
+  3. If "amount" found (without split columns):
+     -> mode = 'single', record amount X range
+  4. Always record "balance" X range to exclude it
+```
+
+### Amount Assignment in Split Mode
+
+```text
+For each amount found on a transaction line:
+  - If amount's X position overlaps with debitX range -> direction = 'debit'
+  - If amount's X position overlaps with creditX range -> direction = 'credit'
+  - If amount's X position overlaps with balanceX range -> skip (ignore)
+  - If no column match -> fall back to existing sign-based logic
+```
+
+### Files Changed
+
+| File | Change Type |
+|------|-------------|
+| `src/lib/pdf/textExtractor.ts` | Add structured line extraction with X positions |
+| `src/lib/pdf/amountParser.ts` | Add multi-amount extraction with positions |
+| `src/lib/pdf/parser.ts` | Add column detection + column-aware parsing loop |
+| `src/lib/fileParser.ts` | Add debit/credit column support to CSV/XLSX |
+
+### No database or schema changes required
+
+All changes are purely in client-side parsing logic.
 
