@@ -108,6 +108,7 @@ export function extractAmount(
 export interface PositionedAmount {
   amount: number;
   x: number;
+  sign?: '+' | '-';
 }
 
 /**
@@ -129,6 +130,11 @@ export function extractAllAmounts(segments: TextSegment[]): PositionedAmount[] {
 
     // Check if the segment looks like a number/amount
     if (AMOUNT_REGEX.test(text)) {
+      // Detect +/- suffix before stripping (Scotiabank style: "5,000.00 +" or "5,000.00 -")
+      let sign: '+' | '-' | undefined;
+      if (text.endsWith('+')) sign = '+';
+      else if (text.endsWith('-')) sign = '-';
+
       const cleaned = text
         .replace(/[$(),\s]/g, '')
         .replace(/\+$/, '')
@@ -142,7 +148,7 @@ export function extractAllAmounts(segments: TextSegment[]): PositionedAmount[] {
 
       const amount = parseFloat(numStr);
       if (!isNaN(amount) && Math.abs(amount) > 0 && Math.abs(amount) < 100_000_000) {
-        results.push({ amount: Math.abs(amount), x: seg.x });
+        results.push({ amount: Math.abs(amount), x: seg.x, sign });
       }
     }
   }

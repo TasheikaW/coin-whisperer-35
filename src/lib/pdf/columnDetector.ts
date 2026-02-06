@@ -82,6 +82,10 @@ export function detectColumnLayout(lines: StructuredLine[], scanLines: number = 
   const linesToScan = lines.slice(0, Math.min(scanLines, lines.length));
 
   for (const line of linesToScan) {
+    // Skip lines with parentheses — these are section titles, not column headers
+    // e.g. "Transactions ( Withdrawals & Deposits )"
+    if (/\(.*\)/.test(line.text)) continue;
+
     let hasDebit = false;
     let hasCredit = false;
 
