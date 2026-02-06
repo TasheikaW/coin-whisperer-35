@@ -18,8 +18,9 @@ export function extractAmount(
   }[] = [
     // ── Currency-prefix with +/- suffix  (Scotiabank style) ──
     // e.g.  "J$ 23,000.00 +"  or  "J$ 5,000.00 -"
+    // Also handles trailing balance: "J$ 5,000.00 - J$ 18,449.42"
     {
-      regex: /\s+(?:[A-Z]{1,3}\$?\s*)?(\$?\s*[\d,]+\.\d{2})\s*(\+|-)\s*$/,
+      regex: /\s+(?:[A-Z]{1,3}\$?\s*)?(\$?\s*[\d,]+\.\d{2})\s*(\+|-)(?:\s+.*)?$/,
       handler: (m, t) => {
         const amountStr = m[1].replace(/[$,\s]/g, '');
         const amount = parseFloat(amountStr);
