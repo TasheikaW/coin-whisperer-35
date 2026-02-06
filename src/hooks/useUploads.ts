@@ -2,8 +2,9 @@ import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { parseFile } from '@/lib/fileParser';
+import { parseFile, ParsedTransaction } from '@/lib/fileParser';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import type { StatementMetadata } from '@/lib/pdfParser';
 
 export type Upload = Tables<'uploads'>;
 
@@ -13,6 +14,13 @@ interface StagedFile {
   name: string;
   type: 'csv' | 'xlsx' | 'pdf';
   size: string;
+}
+
+export interface PreviewData {
+  transactions: ParsedTransaction[];
+  metadata?: StatementMetadata;
+  fileName: string;
+  stagedFile: StagedFile;
 }
 
 const formatFileSize = (bytes: number): string => {
@@ -27,11 +35,31 @@ const getFileType = (file: File): 'csv' | 'xlsx' | 'pdf' => {
   return 'pdf';
 };
 
+// Keyword mappings for auto-categorization
+const KEYWORD_MAPPINGS: Record<string, string[]> = {
+  groceries: ['grocery', 'supermarket', 'walmart', 'target', 'costco', 'kroger', 'safeway', 'trader joe', 'whole foods', 'aldi', 'publix', 'food lion', 'loblaws', 'sobeys', 'metro', 'no frills', 'freshco', 'save-on', 'superstore', 'real canadian', 'food basics', 'longos', 'farm boy'],
+  dining: ['restaurant', 'cafe', 'coffee', 'starbucks', 'mcdonalds', 'mcdonald', 'burger', 'pizza', 'chipotle', 'subway', 'wendys', 'taco bell', 'dunkin', 'grubhub', 'doordash', 'uber eats', 'skip the dishes', 'tim hortons', 'tims', 'a&w', 'kfc', 'popeyes', 'dairy queen', 'harveys', 'boston pizza', 'swiss chalet', 'montanas', 'earls', 'joeys', 'cactus club', 'milestones', 'the keg', 'red lobster', 'olive garden', 'applebees', 'chilis', 'ihop', 'dennys', 'panera', 'nandos', 'five guys', 'in-n-out', 'shake shack', 'panda express', 'chick-fil-a'],
+  transportation: ['uber', 'lyft', 'gas', 'fuel', 'shell', 'exxon', 'chevron', 'bp', 'parking', 'toll', 'transit', 'bus', 'petro', 'esso', 'husky', 'pioneer', 'canadian tire gas', 'presto', 'translink', 'ttc', 'octranspo', 'stm', 'go transit', 'impark', 'indigo parking'],
+  utilities: ['electric', 'power', 'water', 'gas bill', 'internet', 'comcast', 'verizon', 'att', 't-mobile', 'spectrum', 'telus', 'rogers', 'bell', 'shaw', 'fido', 'koodo', 'virgin mobile', 'freedom mobile', 'enmax', 'epcor', 'fortis', 'bc hydro', 'hydro one', 'hydro quebec', 'toronto hydro', 'alectra', 'atco'],
+  entertainment: ['netflix', 'spotify', 'hulu', 'disney', 'amazon prime', 'movie', 'theater', 'theatre', 'concert', 'ticket', 'gaming', 'steam', 'playstation', 'xbox', 'nintendo', 'cineplex', 'landmark cinema', 'apple music', 'youtube premium', 'crave', 'paramount+', 'hbo max', 'peacock', 'twitch'],
+  shopping: ['amazon', 'ebay', 'etsy', 'best buy', 'apple store', 'mall', 'clothing', 'shoes', 'nike', 'adidas', 'canadian tire', 'ikea', 'home depot', 'lowes', 'rona', 'home hardware', 'staples', 'the bay', 'hudson bay', 'winners', 'marshalls', 'homesense', 'dollarama', 'dollar tree', 'sephora', 'ulta', 'lululemon', 'gap', 'old navy', 'h&m', 'zara', 'uniqlo', 'nordstrom', 'simons', 'sportchek', 'atmosphere', 'marks', 'cabelas', 'bass pro', 'lee valley', 'michael', 'bed bath', 'wayfair', 'structube', 'the brick', 'leon'],
+  health: ['pharmacy', 'cvs', 'walgreens', 'doctor', 'hospital', 'medical', 'dental', 'vision', 'gym', 'fitness', 'shoppers drug', 'rexall', 'london drugs', 'pharmasave', 'jean coutu', 'goodlife', 'planet fitness', 'anytime fitness', 'ymca', 'ywca', 'la fitness', 'equinox', 'orangetheory', 'f45', 'crossfit', 'physio', 'chiro', 'massage', 'optometrist', 'clinic'],
+  subscriptions: ['subscription', 'membership', 'monthly', 'annual fee', 'renewal', 'prime member', 'costco member', 'amazon prime'],
+  travel: ['airline', 'hotel', 'airbnb', 'booking', 'expedia', 'flight', 'travel', 'vacation', 'air canada', 'westjet', 'porter', 'flair', 'swoop', 'united', 'delta', 'american airlines', 'southwest', 'marriott', 'hilton', 'hyatt', 'holiday inn', 'best western', 'fairmont', 'vrbo', 'hotels.com', 'trivago', 'kayak', 'hopper'],
+  'rent/mortgage': ['rent', 'mortgage', 'lease', 'property', 'landlord', 'tenant', 'condo fee', 'strata'],
+  income: ['payroll', 'salary', 'direct deposit', 'wage', 'bonus', 'commission', 'deposit', 'income', 'refund', 'cashback', 'reimbursement', 'etransfer in', 'e-transfer in'],
+  transfer: ['transfer', 'xfer', 'tfr', 'zelle', 'venmo', 'paypal', 'cash app', 'interac', 'e-transfer', 'etransfer', 'wire', 'eft'],
+};
+
+const TRANSFER_PATTERN = /transfer|xfer|tfr|move|payment to|payment from|zelle|venmo|paypal|online payment|pmt|payment received|payment - thank/i;
+
 export function useUploads() {
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
+  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -99,6 +127,139 @@ export function useUploads() {
     setStagedFiles(prev => prev.filter(f => f.id !== id));
   }, []);
 
+  // Helper to get categorization context
+  const getCategorizer = async (userId: string) => {
+    const [categoriesResult, rulesResult] = await Promise.all([
+      supabase.from('categories').select('id, name').or(`user_id.is.null,user_id.eq.${userId}`),
+      supabase.from('category_rules').select('category_id, pattern, pattern_type').eq('user_id', userId),
+    ]);
+
+    const categories = categoriesResult.data || [];
+    const rules = rulesResult.data || [];
+    const categoryByName: Record<string, string> = {};
+    categories.forEach(c => { categoryByName[c.name.toLowerCase()] = c.id; });
+
+    return (description: string, direction: string): string | null => {
+      const descLower = description.toLowerCase();
+
+      // 1. User's saved rules first
+      for (const rule of rules) {
+        if (rule.pattern_type === 'merchant' && descLower.includes(rule.pattern.toLowerCase())) {
+          return rule.category_id;
+        }
+      }
+
+      // 2. Keyword matching
+      for (const [categoryName, keywords] of Object.entries(KEYWORD_MAPPINGS)) {
+        for (const keyword of keywords) {
+          if (descLower.includes(keyword)) {
+            return categoryByName[categoryName] || null;
+          }
+        }
+      }
+
+      // 3. Income detection by direction
+      if (direction === 'credit' && categoryByName['income']) {
+        return categoryByName['income'];
+      }
+
+      return null;
+    };
+  };
+
+  // Save a single file's transactions to the database
+  const saveTransactions = async (
+    userId: string,
+    staged: StagedFile,
+    transactions: ParsedTransaction[],
+    autoCategorize: (desc: string, dir: string) => string | null
+  ): Promise<boolean> => {
+    // 1. Upload file to storage
+    const filePath = `${userId}/${Date.now()}-${staged.name}`;
+    const { error: storageError } = await supabase.storage
+      .from('statement-uploads')
+      .upload(filePath, staged.file);
+
+    if (storageError) {
+      console.error('Storage error:', storageError);
+    }
+
+    // 2. Create upload record
+    const uploadInsert: TablesInsert<'uploads'> = {
+      user_id: userId,
+      filename: staged.name,
+      file_type: staged.type,
+      file_size: staged.file.size,
+      status: 'completed',
+      transactions_count: transactions.length,
+      processed_at: new Date().toISOString(),
+    };
+
+    const { data: uploadData, error: uploadError } = await supabase
+      .from('uploads')
+      .insert(uploadInsert)
+      .select()
+      .single();
+
+    if (uploadError) {
+      toast({
+        title: `Failed to save upload record`,
+        description: uploadError.message,
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    // 3. Insert transactions with auto-categorization
+    const transactionsToInsert: TablesInsert<'transactions'>[] = transactions.map(t => ({
+      user_id: userId,
+      upload_id: uploadData.id,
+      transaction_date: t.date,
+      description_raw: t.description,
+      merchant_normalized: t.description.split(/\s+/).slice(0, 3).join(' ').substring(0, 50),
+      amount: Math.abs(t.amount),
+      direction: t.direction,
+      category_id: autoCategorize(t.description, t.direction),
+      is_transfer: TRANSFER_PATTERN.test(t.description),
+      currency: 'USD',
+    }));
+
+    // Insert in batches of 50
+    const batchSize = 50;
+    let insertedCount = 0;
+    
+    for (let i = 0; i < transactionsToInsert.length; i += batchSize) {
+      const batch = transactionsToInsert.slice(i, i + batchSize);
+      const { data: insertedData, error: transactionError } = await supabase
+        .from('transactions')
+        .insert(batch)
+        .select();
+
+      if (transactionError) {
+        console.error('Transaction insert error:', transactionError);
+        toast({
+          title: `Failed to save transactions`,
+          description: transactionError.message,
+          variant: 'destructive',
+        });
+        break;
+      }
+      
+      insertedCount += insertedData?.length || 0;
+    }
+    
+    if (insertedCount === 0) {
+      await supabase
+        .from('uploads')
+        .update({ status: 'error', error_message: 'No transactions were saved' })
+        .eq('id', uploadData.id);
+      return false;
+    }
+
+    return true;
+  };
+
+  // Process upload - parse files and show preview for PDFs, direct import for CSV/XLSX
   const processUpload = useCallback(async () => {
     if (stagedFiles.length === 0) return;
 
@@ -112,70 +273,15 @@ export function useUploads() {
       return;
     }
 
-    setIsUploading(true);
+    setIsParsing(true);
 
-    // Fetch categories and rules for auto-categorization
-    const [categoriesResult, rulesResult] = await Promise.all([
-      supabase.from('categories').select('id, name').or(`user_id.is.null,user_id.eq.${user.id}`),
-      supabase.from('category_rules').select('category_id, pattern, pattern_type').eq('user_id', user.id),
-    ]);
-
-    const categories = categoriesResult.data || [];
-    const rules = rulesResult.data || [];
-
-    // Build category lookup by name (lowercase)
-    const categoryByName: Record<string, string> = {};
-    categories.forEach(c => {
-      categoryByName[c.name.toLowerCase()] = c.id;
-    });
-
-    // Keyword mappings for auto-categorization
-    const keywordMappings: Record<string, string[]> = {
-      groceries: ['grocery', 'supermarket', 'walmart', 'target', 'costco', 'kroger', 'safeway', 'trader joe', 'whole foods', 'aldi', 'publix', 'food lion', 'loblaws', 'sobeys', 'metro', 'no frills', 'freshco', 'save-on', 'superstore', 'real canadian', 'food basics', 'longos', 'farm boy'],
-      dining: ['restaurant', 'cafe', 'coffee', 'starbucks', 'mcdonalds', 'mcdonald', 'burger', 'pizza', 'chipotle', 'subway', 'wendys', 'taco bell', 'dunkin', 'grubhub', 'doordash', 'uber eats', 'skip the dishes', 'tim hortons', 'tims', 'a&w', 'kfc', 'popeyes', 'dairy queen', 'harveys', 'boston pizza', 'swiss chalet', 'montanas', 'earls', 'joeys', 'cactus club', 'milestones', 'the keg', 'red lobster', 'olive garden', 'applebees', 'chilis', 'ihop', 'dennys', 'panera', 'nandos', 'five guys', 'in-n-out', 'shake shack', 'panda express', 'chick-fil-a'],
-      transportation: ['uber', 'lyft', 'gas', 'fuel', 'shell', 'exxon', 'chevron', 'bp', 'parking', 'toll', 'transit', 'bus', 'petro', 'esso', 'husky', 'pioneer', 'canadian tire gas', 'presto', 'translink', 'ttc', 'octranspo', 'stm', 'go transit', 'impark', 'indigo parking'],
-      utilities: ['electric', 'power', 'water', 'gas bill', 'internet', 'comcast', 'verizon', 'att', 't-mobile', 'spectrum', 'telus', 'rogers', 'bell', 'shaw', 'fido', 'koodo', 'virgin mobile', 'freedom mobile', 'enmax', 'epcor', 'fortis', 'bc hydro', 'hydro one', 'hydro quebec', 'toronto hydro', 'alectra', 'atco'],
-      entertainment: ['netflix', 'spotify', 'hulu', 'disney', 'amazon prime', 'movie', 'theater', 'theatre', 'concert', 'ticket', 'gaming', 'steam', 'playstation', 'xbox', 'nintendo', 'cineplex', 'landmark cinema', 'apple music', 'youtube premium', 'crave', 'paramount+', 'hbo max', 'peacock', 'twitch'],
-      shopping: ['amazon', 'ebay', 'etsy', 'best buy', 'apple store', 'mall', 'clothing', 'shoes', 'nike', 'adidas', 'canadian tire', 'ikea', 'home depot', 'lowes', 'rona', 'home hardware', 'staples', 'the bay', 'hudson bay', 'winners', 'marshalls', 'homesense', 'dollarama', 'dollar tree', 'walmart', 'sephora', 'ulta', 'lululemon', 'gap', 'old navy', 'h&m', 'zara', 'uniqlo', 'nordstrom', 'simons', 'sportchek', 'atmosphere', 'marks', 'cabelas', 'bass pro', 'lee valley', 'michael', 'bed bath', 'wayfair', 'structube', 'the brick', 'leon'],
-      health: ['pharmacy', 'cvs', 'walgreens', 'doctor', 'hospital', 'medical', 'dental', 'vision', 'gym', 'fitness', 'shoppers drug', 'rexall', 'london drugs', 'pharmasave', 'jean coutu', 'goodlife', 'planet fitness', 'anytime fitness', 'ymca', 'ywca', 'la fitness', 'equinox', 'orangetheory', 'f45', 'crossfit', 'physio', 'chiro', 'massage', 'optometrist', 'clinic'],
-      subscriptions: ['subscription', 'membership', 'monthly', 'annual fee', 'renewal', 'prime member', 'costco member', 'amazon prime'],
-      travel: ['airline', 'hotel', 'airbnb', 'booking', 'expedia', 'flight', 'travel', 'vacation', 'air canada', 'westjet', 'porter', 'flair', 'swoop', 'united', 'delta', 'american airlines', 'southwest', 'marriott', 'hilton', 'hyatt', 'holiday inn', 'best western', 'fairmont', 'vrbo', 'hotels.com', 'trivago', 'kayak', 'hopper'],
-      'rent/mortgage': ['rent', 'mortgage', 'lease', 'property', 'landlord', 'tenant', 'condo fee', 'strata'],
-      income: ['payroll', 'salary', 'direct deposit', 'wage', 'bonus', 'commission', 'deposit', 'income', 'refund', 'cashback', 'reimbursement', 'etransfer in', 'e-transfer in'],
-      transfer: ['transfer', 'xfer', 'tfr', 'zelle', 'venmo', 'paypal', 'cash app', 'interac', 'e-transfer', 'etransfer', 'wire', 'eft'],
-    };
-
-    // Auto-categorize function
-    const autoCategorize = (description: string, direction: string): string | null => {
-      const descLower = description.toLowerCase();
-
-      // 1. Check user's saved rules first (highest priority)
-      for (const rule of rules) {
-        if (rule.pattern_type === 'merchant' && descLower.includes(rule.pattern.toLowerCase())) {
-          return rule.category_id;
-        }
-      }
-
-      // 2. Keyword matching
-      for (const [categoryName, keywords] of Object.entries(keywordMappings)) {
-        for (const keyword of keywords) {
-          if (descLower.includes(keyword)) {
-            return categoryByName[categoryName] || null;
-          }
-        }
-      }
-
-      // 3. Income detection based on direction
-      if (direction === 'credit' && categoryByName['income']) {
-        return categoryByName['income'];
-      }
-
-      return null; // Uncategorized
-    };
-
-    for (const staged of stagedFiles) {
+    // Check if any file is a PDF - show preview for all files
+    const allFiles = [...stagedFiles];
+    
+    // For single file or PDF files, show preview
+    // For multiple CSV/XLSX files, we could batch but let's show preview for everything
+    for (const staged of allFiles) {
       try {
-        // 1. Parse the file
         const parseResult = await parseFile(staged.file);
         
         if (!parseResult.success) {
@@ -184,6 +290,8 @@ export function useUploads() {
             description: parseResult.error,
             variant: 'destructive',
           });
+          // Remove this file from staged
+          setStagedFiles(prev => prev.filter(f => f.id !== staged.id));
           continue;
         }
 
@@ -193,109 +301,80 @@ export function useUploads() {
             description: `Could not find any transactions in ${staged.name}`,
             variant: 'destructive',
           });
+          setStagedFiles(prev => prev.filter(f => f.id !== staged.id));
           continue;
         }
 
-        // 2. Upload file to storage
-        const filePath = `${user.id}/${Date.now()}-${staged.name}`;
-        const { error: storageError } = await supabase.storage
-          .from('statement-uploads')
-          .upload(filePath, staged.file);
-
-        if (storageError) {
-          console.error('Storage error:', storageError);
-        }
-
-        // 3. Create upload record
-        const uploadInsert: TablesInsert<'uploads'> = {
-          user_id: user.id,
-          filename: staged.name,
-          file_type: staged.type,
-          file_size: staged.file.size,
-          status: 'completed',
-          transactions_count: parseResult.transactions.length,
-          processed_at: new Date().toISOString(),
-        };
-
-        const { data: uploadData, error: uploadError } = await supabase
-          .from('uploads')
-          .insert(uploadInsert)
-          .select()
-          .single();
-
-        if (uploadError) {
-          toast({
-            title: `Failed to save upload record`,
-            description: uploadError.message,
-            variant: 'destructive',
-          });
-          continue;
-        }
-
-        // 4. Insert transactions with auto-categorization
-        const transactionsToInsert: TablesInsert<'transactions'>[] = parseResult.transactions.map(t => ({
-          user_id: user.id,
-          upload_id: uploadData.id,
-          transaction_date: t.date,
-          description_raw: t.description,
-          merchant_normalized: t.description.split(/\s+/).slice(0, 3).join(' ').substring(0, 50),
-          amount: Math.abs(t.amount),
-          direction: t.direction,
-          category_id: autoCategorize(t.description, t.direction),
-          is_transfer: /transfer|xfer|tfr|move|payment to|payment from|zelle|venmo|paypal|online payment|pmt|payment received|payment - thank/i.test(t.description),
-          currency: 'USD',
-        }));
-
-        // Insert in batches of 50
-        const batchSize = 50;
-        let insertedCount = 0;
-        
-        for (let i = 0; i < transactionsToInsert.length; i += batchSize) {
-          const batch = transactionsToInsert.slice(i, i + batchSize);
-          const { data: insertedData, error: transactionError } = await supabase
-            .from('transactions')
-            .insert(batch)
-            .select();
-
-          if (transactionError) {
-            console.error('Transaction insert error:', transactionError);
-            toast({
-              title: `Failed to save transactions`,
-              description: transactionError.message,
-              variant: 'destructive',
-            });
-            break;
-          }
-          
-          insertedCount += insertedData?.length || 0;
-        }
-        
-        if (insertedCount === 0) {
-          await supabase
-            .from('uploads')
-            .update({ status: 'error', error_message: 'No transactions were saved' })
-            .eq('id', uploadData.id);
-          continue;
-        }
-
-        toast({
-          title: 'Upload complete',
-          description: `${parseResult.transactions.length} transactions imported and categorized from ${staged.name}`,
+        // Show preview dialog
+        const metadata = 'metadata' in parseResult ? (parseResult as any).metadata : undefined;
+        setPreviewData({
+          transactions: parseResult.transactions,
+          metadata,
+          fileName: staged.name,
+          stagedFile: staged,
         });
-
+        setIsParsing(false);
+        return; // Process one file at a time through preview
       } catch (error) {
         toast({
           title: `Error processing ${staged.name}`,
           description: String(error),
           variant: 'destructive',
         });
+        setStagedFiles(prev => prev.filter(f => f.id !== staged.id));
       }
     }
 
-    setStagedFiles([]);
-    await fetchUploads();
+    setIsParsing(false);
+  }, [stagedFiles, toast]);
+
+  // Called when user confirms the preview
+  const confirmImport = useCallback(async (transactions: ParsedTransaction[]) => {
+    if (!previewData) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast({
+        title: 'Not authenticated',
+        description: 'Please log in to upload files.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsUploading(true);
+
+    const autoCategorize = await getCategorizer(user.id);
+    const success = await saveTransactions(user.id, previewData.stagedFile, transactions, autoCategorize);
+
+    if (success) {
+      toast({
+        title: 'Upload complete',
+        description: `${transactions.length} transactions imported and categorized from ${previewData.fileName}`,
+      });
+    }
+
+    // Remove this file from staged
+    const importedId = previewData.stagedFile.id;
+    setStagedFiles(prev => prev.filter(f => f.id !== importedId));
+    setPreviewData(null);
     setIsUploading(false);
-  }, [stagedFiles, toast, fetchUploads]);
+    await fetchUploads();
+
+    // If there are more staged files, trigger the next one
+    const remainingFiles = stagedFiles.filter(f => f.id !== importedId);
+    if (remainingFiles.length > 0) {
+      // Will process next on the next render cycle
+      setTimeout(() => {
+        processUpload();
+      }, 100);
+    }
+  }, [previewData, toast, fetchUploads, stagedFiles, processUpload]);
+
+  const cancelPreview = useCallback(() => {
+    setPreviewData(null);
+    setIsParsing(false);
+  }, []);
 
   const deleteUpload = useCallback(async (id: string) => {
     const { error } = await supabase
@@ -327,10 +406,14 @@ export function useUploads() {
     stagedFiles,
     isLoading,
     isUploading,
+    isParsing,
+    previewData,
     fetchUploads,
     addStagedFiles,
     removeStagedFile,
     processUpload,
+    confirmImport,
+    cancelPreview,
     deleteUpload,
     viewUploadTransactions,
   };

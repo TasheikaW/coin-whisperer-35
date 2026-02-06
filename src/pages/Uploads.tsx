@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUploads } from "@/hooks/useUploads";
+import { TransactionPreviewDialog } from "@/components/uploads/TransactionPreviewDialog";
 
 const FileIcon = ({ type }: { type: string }) => {
   if (type === "csv" || type === "xlsx") {
@@ -56,10 +57,14 @@ export default function Uploads() {
     stagedFiles,
     isLoading,
     isUploading,
+    isParsing,
+    previewData,
     fetchUploads,
     addStagedFiles,
     removeStagedFile,
     processUpload,
+    confirmImport,
+    cancelPreview,
     deleteUpload,
     viewUploadTransactions,
   } = useUploads();
@@ -116,14 +121,14 @@ export default function Uploads() {
                   Drop your files here
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  or click to browse. Supports CSV and XLSX files.
+                  or click to browse. Supports CSV, XLSX, and PDF files.
                 </p>
               </div>
               <input
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept=".csv,.xlsx,.xls"
+                accept=".csv,.xlsx,.xls,.pdf"
                 onChange={handleFileSelect}
                 className="hidden"
               />
@@ -146,13 +151,18 @@ export default function Uploads() {
               </CardTitle>
               <Button 
                 onClick={processUpload} 
-                disabled={isUploading}
+                disabled={isUploading || isParsing}
                 className="gap-2"
               >
-                {isUploading ? (
+                {isParsing ? (
                   <>
                     <Loader2 size={18} className="animate-spin" />
-                    Processing...
+                    Parsing...
+                  </>
+                ) : isUploading ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Importing...
                   </>
                 ) : (
                   <>
@@ -267,6 +277,21 @@ export default function Uploads() {
           )}
         </CardContent>
       </Card>
+
+      {/* Transaction Preview Dialog */}
+      {previewData && (
+        <TransactionPreviewDialog
+          open={!!previewData}
+          onOpenChange={(open) => {
+            if (!open) cancelPreview();
+          }}
+          transactions={previewData.transactions}
+          metadata={previewData.metadata}
+          fileName={previewData.fileName}
+          onConfirm={confirmImport}
+          isImporting={isUploading}
+        />
+      )}
     </AppLayout>
   );
 }

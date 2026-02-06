@@ -394,7 +394,8 @@ export const parseFile = async (file: File): Promise<ParseResult> => {
   } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
     return parseXLSX(file);
   } else if (fileName.endsWith('.pdf')) {
-    return { success: false, transactions: [], error: 'PDF parsing is not yet supported. Please convert to CSV or XLSX.' };
+    const { parsePdf } = await import('./pdfParser');
+    return parsePdf(file);
   }
   
   return { success: false, transactions: [], error: 'Unsupported file format' };
