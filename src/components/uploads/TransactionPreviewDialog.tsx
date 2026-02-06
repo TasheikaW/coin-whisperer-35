@@ -122,7 +122,7 @@ export function TransactionPreviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-4xl w-[95vw] overflow-hidden" style={{ maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText size={20} className="text-accent" />
@@ -212,7 +212,7 @@ export function TransactionPreviewDialog({
         </div>
 
         {/* Transaction Table */}
-        <ScrollArea className="flex-1 min-h-0 border rounded-lg">
+        <ScrollArea className="border rounded-lg" style={{ maxHeight: '40vh', minHeight: '150px' }}>
           <div className="overflow-x-auto">
             <table className="data-table w-full">
               <thead>
