@@ -12,7 +12,7 @@ const SKIP_PATTERNS: RegExp[] = [
   /^(credit\s+limit|available\s+credit|cash\s+advance)/i,
   /^(annual\s+percentage|interest\s+rate|daily\s+periodic)/i,
   /^(thank\s+you\s+for|important\s+information|notice)/i,
-  /^(fees?\s+charged|interest\s+charged)/i,
+  // Removed: /^(fees?\s+charged|interest\s+charged)/i — these are real transactions
   /^\s*\d+\s*$/,               // Just a number (page numbers)
   /^(rewards|points|miles)\s/i,
   /^\*+/,                       // Lines starting with asterisks
@@ -24,7 +24,7 @@ const SKIP_PATTERNS: RegExp[] = [
   /^(account\s+summary|account\s+activity)/i,
   /^(your\s+account|account\s+number)/i,
   // ── New patterns ──
-  /^(stamp\s+duty|withholding\s+tax|gct|govt\s*tax)/i,
+  // Removed: /^(stamp\s+duty|withholding\s+tax|gct|govt\s*tax)/i — these are real transactions
   /^(service\s+charge\s+details)/i,
   /^(finance\s+charge\s+summary|rate\s+information)/i,
   /^(payment\s+coupon|payment\s+address|remittance)/i,

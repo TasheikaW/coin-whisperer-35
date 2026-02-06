@@ -151,6 +151,17 @@ function parseNumericValue(text: string): number | null {
 }
 
 /**
+ * Check if text is a standalone currency symbol/code that should be ignored.
+ * e.g. J$, A$, C$, US$, HK$, $, €, £, ¥, USD, EUR, GBP, JMD
+ */
+function isCurrencySymbol(text: string): boolean {
+  const t = text.trim();
+  return /^[A-Z]{0,3}\$$/i.test(t) ||  // J$, A$, US$, HK$, $
+    /^[€£¥]$/.test(t) ||                // standalone symbols
+    /^(USD|EUR|GBP|CAD|JMD|AUD|NZD|HKD|SGD|TTD|BBD|XCD|KYD|BSD)$/i.test(t); // ISO codes
+}
+
+/**
  * Check if a text item is numeric (an amount).
  */
 function isAmountText(text: string): boolean {
@@ -177,6 +188,9 @@ export function assignRowToColumns(
   for (const item of rowItems) {
     const text = item.text.trim();
     if (!text) continue;
+
+    // Skip standalone currency symbols (e.g. J$, $, USD) so they don't pollute descriptions
+    if (isCurrencySymbol(text)) continue;
 
     // Check if this item is close to a known column header X-position
     const isNearCredit = layout.creditX !== null && Math.abs(item.x - layout.creditX) < COLUMN_TOLERANCE;
