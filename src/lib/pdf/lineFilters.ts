@@ -24,7 +24,7 @@ const SKIP_PATTERNS: RegExp[] = [
   /^(account\s+summary|account\s+activity)/i,
   /^(your\s+account|account\s+number)/i,
   // ── New patterns ──
-  /^(stamp\s+duty|withholding\s+tax|gct|govt\s*tax)/i,
+  // Note: STAMP DUTY, WITHHOLDING TAX, GCT/GOVT TAX are real transactions — do NOT skip them
   /^(service\s+charge\s+details)/i,
   /^(finance\s+charge\s+summary|rate\s+information)/i,
   /^(payment\s+coupon|payment\s+address|remittance)/i,

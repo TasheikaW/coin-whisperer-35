@@ -5,7 +5,13 @@ import { extractAmount, extractAllAmounts } from './amountParser';
 import { shouldSkipLine, stripReferencePrefix } from './lineFilters';
 import { detectDirection } from './directionDetector';
 import { extractMetadata, detectStatementYear } from './metadataExtractor';
-import { detectColumnLayout, assignAmountFromColumns, type ColumnLayout } from './columnDetector';
+import { detectGlobalColumnLayout, assignAmountFromColumns, type ColumnLayout } from './columnDetector';
+
+/** Currency prefix pattern to strip from descriptions */
+const CURRENCY_PREFIX_RE = /^[A-Z]{1,3}\$\s*/;
+
+/** Amount-like text pattern */
+const AMOUNT_TEXT_RE = /^[($-]*\$?\s*-?\s*[\d,]+\.\d{2}\s*[)+-]?\s*$/;
 
 /**
  * Clean and normalise a description string.
@@ -16,6 +22,8 @@ function cleanDescription(desc: string): string {
     // Remove posting date at start  (e.g. "01/15 " or "Jan 15 ")
     .replace(/^\d{1,2}\/\d{1,2}\s*/, '')
     .replace(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s*/i, '')
+    // Strip leading currency prefixes (J$, A$, C$, etc.)
+    .replace(CURRENCY_PREFIX_RE, '')
     .replace(/\s+$/, '')
     .trim();
 }
@@ -49,7 +57,21 @@ function tryParseLine(
 }
 
 /**
+ * Check whether a segment is in any of the amount column ranges
+ * (debit, credit, or balance). Used to filter description segments.
+ */
+function isInAmountColumn(segX: number, layout: ColumnLayout): boolean {
+  const inRange = (x: number, r: { min: number; max: number }) => x >= r.min && x <= r.max;
+  if (layout.debitX && inRange(segX, layout.debitX)) return true;
+  if (layout.creditX && inRange(segX, layout.creditX)) return true;
+  if (layout.balanceX && inRange(segX, layout.balanceX)) return true;
+  return false;
+}
+
+/**
  * Attempt column-aware amount extraction using structured segments.
+ * In split mode, builds the description only from segments that are NOT
+ * in any amount column (debit, credit, or balance).
  */
 function tryColumnAwareExtraction(
   structuredLine: StructuredLine,
@@ -63,17 +85,21 @@ function tryColumnAwareExtraction(
   const result = assignAmountFromColumns(amounts, layout);
   if (!result || result.amount <= 0) return null;
 
-  // Build description from non-amount segments
-  // We consider a segment an amount if it was captured in extractAllAmounts
+  // Build description only from segments NOT in any amount column
   const amountXPositions = new Set(amounts.map(a => a.x));
   const descSegments = structuredLine.segments.filter(seg => {
-    // Skip segments that are amounts or in the balance column
+    // Skip segments that were detected as amounts
     if (amountXPositions.has(seg.x)) return false;
-    if (layout.balanceX && seg.x >= layout.balanceX.min && seg.x <= layout.balanceX.max) return false;
+    // Skip segments in the balance column
+    if (isInAmountColumn(seg.x, layout)) return false;
+    // Skip segments that look like amounts
+    if (AMOUNT_TEXT_RE.test(seg.text.trim())) return false;
     return true;
   });
 
-  const description = descSegments.map(s => s.text).join(' ').trim();
+  const rawDesc = descSegments.map(s => s.text).join(' ').trim();
+  // Strip currency prefixes from description
+  const description = rawDesc.replace(CURRENCY_PREFIX_RE, '').trim();
 
   return {
     amount: result.amount,
@@ -105,14 +131,14 @@ export async function parsePdf(file: File): Promise<PdfParseResult> {
     console.log('PDF metadata:', metadata);
     console.log('Context year:', contextYear);
 
+    // Detect column layout GLOBALLY across all pages
+    const globalLayout = detectGlobalColumnLayout(structuredPages);
+    console.log('Global column layout:', globalLayout);
+
     const transactions: ParsedTransaction[] = [];
     const seenTransactions = new Set<string>();
 
     for (const page of structuredPages) {
-      // Detect column layout for this page
-      const layout = detectColumnLayout(page.lines);
-      console.log('Column layout:', layout);
-
       const lines = page.lines;
 
       for (let i = 0; i < lines.length; i++) {
@@ -127,11 +153,10 @@ export async function parsePdf(file: File): Promise<PdfParseResult> {
         const { date, remainingText } = parsed;
 
         // ── Strategy 1: Column-aware extraction for split debit/credit ──
-        if (layout.mode === 'split') {
-          const colResult = tryColumnAwareExtraction(structuredLine, layout);
+        if (globalLayout.mode === 'split') {
+          const colResult = tryColumnAwareExtraction(structuredLine, globalLayout);
           if (colResult && colResult.amount > 0) {
-            // Extract the description from the date-parsed remaining text
-            // (better than from raw segments since it strips dates)
+            // Build description: prefer date-parsed text (strips dates) but fall back to column-aware
             const descFromText = cleanDescription(remainingText.replace(/[\d,]+\.\d{2}/g, '').trim());
             const description = descFromText.length > 2 ? descFromText : cleanDescription(colResult.description);
 
@@ -165,6 +190,10 @@ export async function parsePdf(file: File): Promise<PdfParseResult> {
               continue;
             }
           }
+
+          // In split mode, if column-aware extraction fails (no amount in debit/credit column),
+          // skip the line rather than falling through to sign-based guessing
+          continue;
         }
 
         // ── Strategy 2: Single-column / sign-based extraction (existing logic) ──
