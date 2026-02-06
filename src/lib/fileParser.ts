@@ -11,6 +11,7 @@ export interface ParseResult {
   success: boolean;
   transactions: ParsedTransaction[];
   error?: string;
+  currency?: string;
 }
 
 // Common date formats to try parsing
@@ -394,7 +395,7 @@ export const parseFile = async (file: File): Promise<ParseResult> => {
   } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
     return parseXLSX(file);
   } else if (fileName.endsWith('.pdf')) {
-    const { parsePdf } = await import('./pdfParser');
+    const { parsePdf } = await import('./pdf');
     return parsePdf(file);
   }
   
