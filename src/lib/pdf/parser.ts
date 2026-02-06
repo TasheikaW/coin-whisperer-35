@@ -5,6 +5,8 @@ import { extractAmount } from './amountParser';
 import { shouldSkipLine, stripReferencePrefix } from './lineFilters';
 import { detectDirection } from './directionDetector';
 import { extractMetadata, detectStatementYear } from './metadataExtractor';
+import { extractItemsFromPdf, detectColumnLayout } from './columnExtractor';
+import { parseWithColumns } from './columnParser';
 
 /**
  * Clean and normalise a description string.
@@ -52,6 +54,47 @@ function tryParseLine(
  */
 export async function parsePdf(file: File): Promise<PdfParseResult> {
   try {
+    // ── Strategy 1: Column-based parsing (Credit/Debit/Balance columns) ──
+    let pageItems;
+    try {
+      pageItems = await extractItemsFromPdf(file);
+      const layout = detectColumnLayout(pageItems);
+
+      if (layout) {
+        console.log('Detected column layout, using column-based parser');
+
+        // Build full text for metadata extraction
+        const fullText = pageItems
+          .map(p =>
+            [...p.rows.entries()]
+              .sort(([a], [b]) => b - a)
+              .map(([, items]) => items.map(i => i.text).join(' '))
+              .join('\n'),
+          )
+          .join('\n');
+
+        const metadata = extractMetadata(fullText);
+        const columnResult = parseWithColumns(pageItems, layout, fullText);
+
+        if (columnResult.transactions.length > 0) {
+          console.log(
+            `Column parser extracted ${columnResult.transactions.length} transactions`,
+          );
+          return {
+            success: true,
+            transactions: columnResult.transactions,
+            metadata,
+            currency: columnResult.currency || metadata.currency,
+          };
+        }
+
+        console.log('Column parser found 0 transactions, falling back to line-based parser');
+      }
+    } catch (colErr) {
+      console.warn('Column-based parsing failed, falling back to line-based:', colErr);
+    }
+
+    // ── Strategy 2: Line-based parsing (existing logic) ──
     const pages = await extractTextFromPdf(file);
 
     if (pages.length === 0 || pages.every(p => !p.trim())) {
