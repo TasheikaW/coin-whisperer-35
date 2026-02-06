@@ -1,4 +1,4 @@
-import type { StructuredLine, TextSegment } from './textExtractor';
+import type { StructuredLine, StructuredPage, TextSegment } from './textExtractor';
 
 /**
  * Range of X positions for a detected column.
@@ -35,8 +35,9 @@ function matchesKeywords(text: string, keywords: string[]): boolean {
 
 /**
  * Find the X range for a segment (using its X position and width).
+ * Reduced tolerance from 40 to 20 to prevent overlapping column ranges.
  */
-function segmentRange(seg: TextSegment, tolerance: number = 40): XRange {
+function segmentRange(seg: TextSegment, tolerance: number = 20): XRange {
   return {
     min: seg.x - tolerance,
     max: seg.x + seg.width + tolerance,
@@ -44,7 +45,30 @@ function segmentRange(seg: TextSegment, tolerance: number = 40): XRange {
 }
 
 /**
- * Detect the column layout from the first N lines of a page.
+ * Resolve overlapping debit and credit column ranges by splitting at the midpoint.
+ */
+function resolveOverlaps(layout: ColumnLayout): void {
+  if (layout.debitX && layout.creditX) {
+    // Ensure debitX is to the left of creditX; swap if needed
+    if (layout.debitX.min > layout.creditX.min) {
+      const tmp = layout.debitX;
+      layout.debitX = layout.creditX;
+      layout.creditX = tmp;
+      // Note: direction assignment is based on original header keyword, not position,
+      // so we don't need to swap directions
+    }
+
+    // Check for overlap and resolve
+    if (layout.debitX.max > layout.creditX.min) {
+      const mid = (layout.debitX.max + layout.creditX.min) / 2;
+      layout.debitX.max = mid;
+      layout.creditX.min = mid;
+    }
+  }
+}
+
+/**
+ * Detect the column layout from the first N lines of a set of lines.
  * Looks for header rows containing debit/credit/amount/balance keywords
  * and records their X-position ranges.
  */
@@ -78,12 +102,31 @@ export function detectColumnLayout(lines: StructuredLine[], scanLines: number = 
     // If we found both debit and credit on the same header line, we have a split layout
     if (hasDebit && hasCredit) {
       layout.mode = 'split';
-      // We found the header — stop scanning
+      resolveOverlaps(layout);
       break;
     }
   }
 
   return layout;
+}
+
+/**
+ * Detect column layout globally across ALL pages.
+ * Returns the first valid split-mode layout found, ensuring pages
+ * without headers still get the correct column assignments.
+ */
+export function detectGlobalColumnLayout(pages: StructuredPage[]): ColumnLayout {
+  for (const page of pages) {
+    const layout = detectColumnLayout(page.lines);
+    if (layout.mode === 'split') {
+      console.log('Global column layout detected (split mode):', layout);
+      return layout;
+    }
+  }
+
+  // Fallback: single mode
+  console.log('Global column layout: single mode (no split headers found)');
+  return { mode: 'single' };
 }
 
 /**
@@ -99,7 +142,7 @@ export function assignAmountFromColumns(
   if (amountSegments.length === 0) return null;
 
   if (layout.mode === 'split' && (layout.debitX || layout.creditX)) {
-    // Filter out balance column amounts first
+    // Filter out balance column amounts
     const filtered = amountSegments.filter(seg => {
       if (layout.balanceX && isInRange(seg.x, layout.balanceX)) return false;
       return true;
@@ -115,15 +158,8 @@ export function assignAmountFromColumns(
       }
     }
 
-    // If we have filtered amounts that don't match any column,
-    // use the first non-balance one with sign-based direction
-    if (filtered.length > 0) {
-      return {
-        amount: filtered[0].amount,
-        direction: 'debit', // default
-      };
-    }
-
+    // In split mode, if an amount doesn't match any known column, skip it entirely.
+    // Don't default to debit — this prevents balance column values from leaking through.
     return null;
   }
 
