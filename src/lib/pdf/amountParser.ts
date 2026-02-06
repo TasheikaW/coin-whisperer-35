@@ -1,3 +1,5 @@
+import type { TextSegment } from './textExtractor';
+
 /**
  * Extract an amount (and its credit/debit signal) from the end of a text line.
  *
@@ -98,4 +100,52 @@ export function extractAmount(
   }
 
   return null;
+}
+
+/**
+ * A parsed amount with its X position for column-aware matching.
+ */
+export interface PositionedAmount {
+  amount: number;
+  x: number;
+}
+
+/**
+ * Amount pattern for extracting all numeric amounts from segments.
+ * Matches common amount formats: 1,234.56, $1234.56, -500.00, etc.
+ */
+const AMOUNT_REGEX = /^[($-]*\$?\s*-?\s*[\d,]+\.\d{2}\s*[)+-]?\s*$/;
+
+/**
+ * Extract ALL amount-like values from a line's segments, each with its X position.
+ * Used in column-aware mode to match amounts to debit/credit/balance columns.
+ */
+export function extractAllAmounts(segments: TextSegment[]): PositionedAmount[] {
+  const results: PositionedAmount[] = [];
+
+  for (const seg of segments) {
+    const text = seg.text.trim();
+    if (!text) continue;
+
+    // Check if the segment looks like a number/amount
+    if (AMOUNT_REGEX.test(text)) {
+      const cleaned = text
+        .replace(/[$(),\s]/g, '')
+        .replace(/\+$/, '')
+        .replace(/-$/, (m) => m); // Keep trailing minus for now
+
+      // Handle trailing minus: "500.00-" -> "-500.00"
+      let numStr = cleaned;
+      if (numStr.endsWith('-')) {
+        numStr = '-' + numStr.slice(0, -1);
+      }
+
+      const amount = parseFloat(numStr);
+      if (!isNaN(amount) && Math.abs(amount) > 0 && Math.abs(amount) < 100_000_000) {
+        results.push({ amount: Math.abs(amount), x: seg.x });
+      }
+    }
+  }
+
+  return results;
 }
