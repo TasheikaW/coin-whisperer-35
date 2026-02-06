@@ -1,119 +1,145 @@
 
 
-# Fix PDF Column Detection to Correctly Extract Only Date, Description, and Amount
+# Fix PDF Parser: False Split Detection and Balance Column Leakage
 
-## Problem
+## Root Cause
 
-The current parser is picking up **Balance column** values as transaction amounts and mangling descriptions. For example:
+Three issues prevent this Scotiabank PDF from parsing:
 
-| Expected | What parser produces |
-|----------|---------------------|
-| THIRD PARTY TRF BNS: J$ 5,000.00 (debit) | Amount = 18,449.42 (this is the balance!) |
-| GCT/GOVT TAX: J$ 4.14 (debit) | Amount = 17,029.68 (this is the balance!) |
-| INTEREST PAYMENT: J$ 4.54 (credit) | Description = "J$" (amount stripped, balance used) |
+1. The section title "Transactions ( Withdrawals & Deposits )" is incorrectly detected as column headers because PDF.js splits it into short segments like "Withdrawals" and "Deposits" that match debit/credit keywords. This falsely activates split-column mode, which then skips every transaction because no amounts fall in the expected column ranges.
 
-**Root causes:**
-1. Column header detection runs per-page, but headers only appear on one page -- other pages fall back to unreliable "single" mode
-2. The 40px tolerance makes Credit and Debit column ranges overlap (creditX max=427, debitX min=395)
-3. When column detection fails, the parser grabs the last number on the line which is often the Balance
-4. Skip patterns incorrectly filter out valid transactions like STAMP DUTY TAX, WITHHOLDING TAX, GCT/GOVT TAX
+2. Even after fixing the false split detection, the parser would grab Balance column values as transaction amounts. In single-column mode, `extractAmount()` matches the LAST number on the line (the balance), not the transaction amount with the `+/-` suffix.
 
-## Solution
+3. `extractAllAmounts()` strips the `+/-` sign from amounts, losing debit/credit direction information needed for column-aware extraction in single mode.
 
-### 1. Global column detection across all pages
+## Changes
+
+### 1. Skip title/section header lines in column detection
 
 **File: `src/lib/pdf/columnDetector.ts`**
 
-Instead of detecting columns per-page (which fails when headers are only on one page), scan ALL pages first and use the best layout found for the entire document.
+In `detectColumnLayout()`, skip lines whose text contains parentheses (e.g., "Transactions ( Withdrawals & Deposits )"). Real table column headers virtually never use parentheses around keywords, so this safely filters out section titles.
 
-- Add a new function `detectGlobalColumnLayout(pages)` that scans every page and returns the first valid split-mode layout found
-- If no split layout is found across any page, return single mode
-- This ensures pages without headers still get the correct column assignments
+### 2. Preserve sign info in extractAllAmounts
 
-### 2. Fix overlapping column ranges
+**File: `src/lib/pdf/amountParser.ts`**
 
-**File: `src/lib/pdf/columnDetector.ts`**
+Update `PositionedAmount` to include an optional `sign` field (`'+' | '-'`). Before stripping the text, check if the raw segment ends with `+` or `-` and preserve that info.
 
-- Reduce the default tolerance from 40px to 20px to prevent Credit and Debit ranges from overlapping
-- Add overlap validation: if debitX and creditX ranges overlap, adjust them so they don't (use the midpoint as the boundary)
-- Use the actual segment width more accurately instead of adding large padding
-
-### 3. Exclude balance column more aggressively
-
-**File: `src/lib/pdf/columnDetector.ts`** and **`src/lib/pdf/parser.ts`**
-
-- When balance column is detected, any amount whose X position is to the right of BOTH the credit and debit columns should be excluded
-- In `assignAmountFromColumns`: if an amount doesn't match any known column (debit/credit), skip it entirely in split mode instead of defaulting to debit
-
-### 4. Remove incorrect skip patterns
-
-**File: `src/lib/pdf/lineFilters.ts`**
-
-Remove these patterns that incorrectly skip valid transactions:
-- `STAMP DUTY` -- this is a real transaction
-- `WITHHOLDING TAX` -- this is a real transaction
-- `GCT/GOVT TAX` -- this is a real transaction
-
-Keep skip patterns only for section headers like "SERVICE CHARGE DETAILS" (not "SERVICE CHARGE" which is a transaction).
-
-### 5. Improve description cleaning in split-column mode
+### 3. Enable column-aware extraction in single mode
 
 **File: `src/lib/pdf/parser.ts`**
 
-When in split-column mode, the description should be built by:
-- Taking text segments that are NOT in the credit, debit, or balance column ranges
-- Stripping currency prefixes like "J$" from the description
-- Not concatenating amount values into descriptions
+Currently `tryColumnAwareExtraction()` only works when mode is `'split'`. Update it to also work in single mode when a balance column has been detected:
+
+- Get all amounts with positions
+- Filter out amounts in the balance column range
+- Use the first remaining amount
+- Use preserved sign info for direction ('+' = credit, '-' = debit)
+- Fall back to keyword-based direction detection if no sign info
+
+This prevents the balance value from ever being used as the transaction amount.
 
 ---
 
 ## Technical Details
 
-### Changes to `src/lib/pdf/columnDetector.ts`
+### `src/lib/pdf/columnDetector.ts`
 
-1. Add `detectGlobalColumnLayout(allPages)` function:
-   - Iterates through all pages' lines
-   - Returns the first split-mode layout detected
-   - Falls back to single mode if none found
+Add a line-level check at the start of the scanning loop:
 
-2. Reduce tolerance in `segmentRange()` from 40 to 20
+```text
+for (const line of linesToScan) {
+  // NEW: Skip lines with parentheses - these are section titles, not headers
+  if (/\(.*\)/.test(line.text)) continue;
+  // ... rest of existing detection
+}
+```
 
-3. Add overlap resolution in `detectColumnLayout()`:
-   - After detecting ranges, check if debitX and creditX overlap
-   - If they do, set the boundary at the midpoint between them
+### `src/lib/pdf/amountParser.ts`
 
-4. In `assignAmountFromColumns()`:
-   - When mode is split but amount doesn't match debit or credit range, return null (don't default to debit)
-   - Add a "rightmost column exclusion" -- if balance wasn't explicitly detected, treat the rightmost amount column as balance and exclude it
+Extend PositionedAmount:
 
-### Changes to `src/lib/pdf/lineFilters.ts`
+```text
+export interface PositionedAmount {
+  amount: number;
+  x: number;
+  sign?: '+' | '-';  // NEW: preserved from suffix
+}
+```
 
-Remove these regex patterns from SKIP_PATTERNS:
-- `/^(stamp\s+duty|withholding\s+tax|gct|govt\s*tax)/i`
+In `extractAllAmounts()`, detect sign before stripping:
 
-Make the "service charge details" pattern more specific so it only matches the section header, not individual "SERVICE CHARGE" transactions.
+```text
+const trimText = text.trim();
+let sign: '+' | '-' | undefined;
+if (trimText.endsWith('+')) sign = '+';
+else if (trimText.endsWith('-')) sign = '-';
+// ... existing parsing ...
+results.push({ amount, x: seg.x, sign });
+```
 
-### Changes to `src/lib/pdf/parser.ts`
+### `src/lib/pdf/parser.ts`
 
-1. Replace per-page `detectColumnLayout(page.lines)` with a single global layout detection at the start
+Update `tryColumnAwareExtraction()` to handle single mode:
 
-2. In `tryColumnAwareExtraction()`:
-   - Build description only from segments whose X position falls BEFORE the credit/debit columns
-   - Strip "J$", "A$", "C$" prefixes from description segments
-   - Don't include amount-like text in the description
+```text
+function tryColumnAwareExtraction(structuredLine, layout) {
+  // NEW: Also work in single mode when balance column is detected
+  if (layout.mode !== 'split' && !layout.balanceX) return null;
 
-3. In the main parse loop, when split mode is active:
-   - If column-aware extraction succeeds, use it exclusively (don't fall through to Strategy 2)
-   - If it fails (no amount in credit/debit column), skip the line rather than guessing
+  const amounts = extractAllAmounts(structuredLine.segments);
+  if (amounts.length === 0) return null;
+
+  if (layout.mode === 'split') {
+    // Existing split mode logic (unchanged)
+    ...
+  } else {
+    // Single mode with balance column knowledge
+    // Filter out balance column amounts
+    const filtered = amounts.filter(a => !isInRange(a.x, layout.balanceX));
+    if (filtered.length === 0) return null;
+
+    // Use the first non-balance amount
+    const main = filtered[0];
+
+    // Use preserved sign for direction
+    let direction: 'debit' | 'credit' = 'debit';
+    if (main.sign === '+') direction = 'credit';
+    else if (main.sign === '-') direction = 'debit';
+
+    // Build description from non-amount, non-balance segments
+    ...
+    return { amount: main.amount, direction, description };
+  }
+}
+```
+
+Update the main parse loop to also try column-aware extraction in single mode (when balance column is known):
+
+```text
+// Try column-aware extraction (works for both split AND single-with-balance)
+const colResult = tryColumnAwareExtraction(structuredLine, globalLayout);
+if (colResult && colResult.amount > 0) {
+  // ... add transaction
+  continue;
+}
+
+// If split mode and column-aware failed, skip (don't guess)
+if (globalLayout.mode === 'split') continue;
+
+// Fall through to Strategy 2 only if no column info available
+```
 
 ### Files Changed
 
-| File | Type of Change |
-|------|---------------|
-| `src/lib/pdf/columnDetector.ts` | Add global detection, fix tolerance, fix overlap, fix fallback |
-| `src/lib/pdf/lineFilters.ts` | Remove 1 skip pattern that filters valid transactions |
-| `src/lib/pdf/parser.ts` | Use global layout, improve description building, fix Strategy 1 |
+| File | Change |
+|------|--------|
+| `src/lib/pdf/columnDetector.ts` | Skip parenthetical lines in column detection |
+| `src/lib/pdf/amountParser.ts` | Preserve sign info in PositionedAmount |
+| `src/lib/pdf/parser.ts` | Enable column-aware extraction in single mode with balance filtering |
 
 ### No database changes required
 
-All changes are client-side parsing logic only.
+All changes are in client-side parsing logic only.
+
