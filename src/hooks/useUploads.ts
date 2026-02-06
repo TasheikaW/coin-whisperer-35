@@ -240,7 +240,7 @@ export function useUploads() {
           direction: t.direction,
           category_id: autoCategorize(t.description, t.direction),
           is_transfer: TRANSFER_PATTERN.test(t.description),
-          currency: 'USD',
+          currency: parseResult.currency || 'USD',
         }));
 
         // Insert in batches of 50

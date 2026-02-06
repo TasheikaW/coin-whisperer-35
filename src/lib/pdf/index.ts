@@ -1,0 +1,9 @@
+/**
+ * Universal PDF bank-statement parser.
+ *
+ * Supports many international formats including Scotiabank (Jamaica),
+ * American Express, generic credit cards with reference-prefixed lines,
+ * and standard North-American / Australian / European layouts.
+ */
+export { parsePdf } from './parser';
+export type { PdfParseResult, StatementMetadata, ParsedTransaction } from './types';
