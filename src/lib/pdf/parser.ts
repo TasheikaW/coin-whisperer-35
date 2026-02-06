@@ -13,6 +13,28 @@ const CURRENCY_PREFIX_RE = /^[A-Z]{1,3}\$\s*/;
 /** Amount-like text pattern */
 const AMOUNT_TEXT_RE = /^[($-]*\$?\s*-?\s*[\d,]+\.\d{2}\s*[)+-]?\s*$/;
 
+/** Patterns that signal the end of the transaction table */
+const END_OF_TABLE_PATTERNS = [
+  /closing\s*balance/i,
+  /opening\s*balance/i,
+  /total\s*debits/i,
+  /total\s*credits/i,
+  /total\s*withdrawals/i,
+  /total\s*deposits/i,
+  /statement\s*summary/i,
+  /interest\s*charged/i,
+  /service\s*charges/i,
+];
+
+/**
+ * Check if a line is an end-of-table marker (summary row, totals, etc.)
+ */
+function isEndOfTableMarker(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  return END_OF_TABLE_PATTERNS.some(p => p.test(trimmed));
+}
+
 /**
  * Clean and normalise a description string.
  */
@@ -160,14 +182,31 @@ export async function parsePdf(file: File): Promise<PdfParseResult> {
     const transactions: ParsedTransaction[] = [];
     const seenTransactions = new Set<string>();
 
-    for (const page of structuredPages) {
-      const lines = page.lines;
+    // Determine page/line boundaries from header detection
+    const headerPageIndex = globalLayout.headerPageIndex;
+    const tableStartLine = globalLayout.tableStartLine;
+    const hasHeader = headerPageIndex >= 0;
 
-      for (let i = 0; i < lines.length; i++) {
+    for (let pageIdx = 0; pageIdx < structuredPages.length; pageIdx++) {
+      // If a header was found, skip pages before the header page
+      if (hasHeader && pageIdx < headerPageIndex) continue;
+
+      const lines = structuredPages[pageIdx].lines;
+
+      // Determine which line to start from on this page
+      const startLine = (hasHeader && pageIdx === headerPageIndex) ? tableStartLine : 0;
+
+      for (let i = startLine; i < lines.length; i++) {
         const structuredLine = lines[i];
         const lineText = structuredLine.text;
 
         if (shouldSkipLine(lineText)) continue;
+
+        // End-of-table detection: stop parsing this page if we hit summary markers
+        if (isEndOfTableMarker(lineText)) {
+          console.log(`End-of-table marker found: "${lineText.trim().slice(0, 50)}"`);
+          break;
+        }
 
         const parsed = tryParseLine(lineText, contextYear);
         if (!parsed) continue;
