@@ -1,10 +1,11 @@
 import type { ParsedTransaction, PdfParseResult } from './types';
-import { extractTextFromPdf } from './textExtractor';
+import { extractStructuredTextFromPdf, type StructuredPage, type StructuredLine } from './textExtractor';
 import { parseDateFromLine } from './dateParser';
-import { extractAmount } from './amountParser';
+import { extractAmount, extractAllAmounts } from './amountParser';
 import { shouldSkipLine, stripReferencePrefix } from './lineFilters';
 import { detectDirection } from './directionDetector';
 import { extractMetadata, detectStatementYear } from './metadataExtractor';
+import { detectColumnLayout, assignAmountFromColumns, type ColumnLayout } from './columnDetector';
 
 /**
  * Clean and normalise a description string.
@@ -20,7 +21,7 @@ function cleanDescription(desc: string): string {
 }
 
 /**
- * Try to parse a single line (or line + next lines) into a transaction.
+ * Try to parse a single line into a transaction date + remaining text.
  * Returns null when the line is not a transaction.
  */
 function tryParseLine(
@@ -48,13 +49,47 @@ function tryParseLine(
 }
 
 /**
+ * Attempt column-aware amount extraction using structured segments.
+ */
+function tryColumnAwareExtraction(
+  structuredLine: StructuredLine,
+  layout: ColumnLayout,
+): { amount: number; direction: 'debit' | 'credit'; description: string } | null {
+  if (layout.mode !== 'split') return null;
+
+  const amounts = extractAllAmounts(structuredLine.segments);
+  if (amounts.length === 0) return null;
+
+  const result = assignAmountFromColumns(amounts, layout);
+  if (!result || result.amount <= 0) return null;
+
+  // Build description from non-amount segments
+  // We consider a segment an amount if it was captured in extractAllAmounts
+  const amountXPositions = new Set(amounts.map(a => a.x));
+  const descSegments = structuredLine.segments.filter(seg => {
+    // Skip segments that are amounts or in the balance column
+    if (amountXPositions.has(seg.x)) return false;
+    if (layout.balanceX && seg.x >= layout.balanceX.min && seg.x <= layout.balanceX.max) return false;
+    return true;
+  });
+
+  const description = descSegments.map(s => s.text).join(' ').trim();
+
+  return {
+    amount: result.amount,
+    direction: result.direction,
+    description,
+  };
+}
+
+/**
  * Main PDF parsing function.
  */
 export async function parsePdf(file: File): Promise<PdfParseResult> {
   try {
-    const pages = await extractTextFromPdf(file);
+    const structuredPages = await extractStructuredTextFromPdf(file);
 
-    if (pages.length === 0 || pages.every(p => !p.trim())) {
+    if (structuredPages.length === 0 || structuredPages.every(p => !p.text.trim())) {
       return {
         success: false,
         transactions: [],
@@ -63,7 +98,7 @@ export async function parsePdf(file: File): Promise<PdfParseResult> {
       };
     }
 
-    const fullText = pages.join('\n');
+    const fullText = structuredPages.map(p => p.text).join('\n');
     const metadata = extractMetadata(fullText);
     const contextYear = detectStatementYear(fullText);
 
@@ -73,19 +108,66 @@ export async function parsePdf(file: File): Promise<PdfParseResult> {
     const transactions: ParsedTransaction[] = [];
     const seenTransactions = new Set<string>();
 
-    for (const pageText of pages) {
-      const lines = pageText.split('\n');
+    for (const page of structuredPages) {
+      // Detect column layout for this page
+      const layout = detectColumnLayout(page.lines);
+      console.log('Column layout:', layout);
+
+      const lines = page.lines;
 
       for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (shouldSkipLine(line)) continue;
+        const structuredLine = lines[i];
+        const lineText = structuredLine.text;
 
-        const parsed = tryParseLine(line, contextYear);
+        if (shouldSkipLine(lineText)) continue;
+
+        const parsed = tryParseLine(lineText, contextYear);
         if (!parsed) continue;
 
         const { date, remainingText } = parsed;
 
-        // ── Try to extract amount from this line ──
+        // ── Strategy 1: Column-aware extraction for split debit/credit ──
+        if (layout.mode === 'split') {
+          const colResult = tryColumnAwareExtraction(structuredLine, layout);
+          if (colResult && colResult.amount > 0) {
+            // Extract the description from the date-parsed remaining text
+            // (better than from raw segments since it strips dates)
+            const descFromText = cleanDescription(remainingText.replace(/[\d,]+\.\d{2}/g, '').trim());
+            const description = descFromText.length > 2 ? descFromText : cleanDescription(colResult.description);
+
+            if (description.length > 1) {
+              // Gather continuation lines
+              const descParts = [description];
+              let j = i + 1;
+              while (j < lines.length) {
+                const nextLine = lines[j].text.trim();
+                if (!nextLine || shouldSkipLine(nextLine)) { j++; continue; }
+                const strippedNext = stripReferencePrefix(nextLine);
+                if (parseDateFromLine(strippedNext, contextYear)) break;
+                if (extractAllAmounts(lines[j].segments).length > 0) break;
+                descParts.push(nextLine);
+                j++;
+              }
+
+              const fullDesc = descParts.join(' — ');
+              const dedupeKey = `${date}|${colResult.amount}|${fullDesc.slice(0, 20)}`;
+
+              if (!seenTransactions.has(dedupeKey)) {
+                seenTransactions.add(dedupeKey);
+                transactions.push({
+                  date,
+                  description: fullDesc,
+                  amount: colResult.amount,
+                  direction: colResult.direction,
+                });
+              }
+              i = j - 1;
+              continue;
+            }
+          }
+        }
+
+        // ── Strategy 2: Single-column / sign-based extraction (existing logic) ──
         let amountResult = extractAmount(remainingText);
 
         if (amountResult && amountResult.description.length >= 2) {
@@ -93,7 +175,7 @@ export async function parsePdf(file: File): Promise<PdfParseResult> {
           const descParts = [cleanDescription(amountResult.description)];
           let j = i + 1;
           while (j < lines.length) {
-            const nextLine = lines[j].trim();
+            const nextLine = lines[j].text.trim();
             if (!nextLine || shouldSkipLine(nextLine)) { j++; continue; }
             // If the next line starts with a date, stop gathering
             const strippedNext = stripReferencePrefix(nextLine);
@@ -128,7 +210,7 @@ export async function parsePdf(file: File): Promise<PdfParseResult> {
 
         // ── Amount not on this line — try combining with the next line ──
         if (i + 1 < lines.length) {
-          const combinedText = remainingText + '  ' + lines[i + 1].trim();
+          const combinedText = remainingText + '  ' + lines[i + 1].text.trim();
           amountResult = extractAmount(combinedText);
           if (amountResult && amountResult.description.length > 2) {
             const description = cleanDescription(amountResult.description);
