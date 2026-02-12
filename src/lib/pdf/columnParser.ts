@@ -45,6 +45,21 @@ function isSkipRow(row: ColumnRow): boolean {
 }
 
 /**
+ * Clean a merged description: remove trailing numbers, reference codes, standalone symbols.
+ * Keeps hyphens inside words (e.g. PC-BILL) but strips standalone ones.
+ */
+function cleanMergedDescription(desc: string): string {
+  return desc
+    // Remove standalone numbers (whole tokens that are purely digits)
+    .replace(/\b\d+\b/g, '')
+    // Remove standalone symbols (not hyphens inside words)
+    .replace(/(?<![A-Za-z])-(?![A-Za-z])/g, '')
+    // Collapse multiple spaces
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/**
  * Clean amount text: strip currency symbols, commas, +/-, whitespace
  */
 function cleanAmount(text: string): number | null {
@@ -89,7 +104,7 @@ export function parseWithColumns(
 
   const flushPending = () => {
     if (!pendingTx) return;
-    const description = pendingTx.descParts.join(' — ').trim();
+    const description = cleanMergedDescription(pendingTx.descParts.join(' '));
     if (description.length > 1) {
       const dedupeKey = `${pendingTx.date}|${pendingTx.amount}|${description.slice(0, 20)}`;
       if (!seenKeys.has(dedupeKey)) {
