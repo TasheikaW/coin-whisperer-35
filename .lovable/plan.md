@@ -1,56 +1,89 @@
 
-
-# Fix: Descriptions Showing as "J$" Instead of Actual Text
+# Fix: Clean Descriptions and Merchant Names
 
 ## Problem
-When the PDF is parsed, many transaction descriptions show as just "J$" (the Jamaican dollar currency symbol) instead of the actual transaction description like "INTEREST PAYMENT" or "POS PURCHASE - RESTAURANTS OF JA-ECOM KINGSTON 19 JM".
+From the screenshot, transactions show descriptions like:
+- **"J$ — STAMP"** instead of **"STAMP DUTY TAX"**
+- **"J$ — 8763729167"** instead of **"DIGICEL"**
+- **"J$"** alone with no useful description
+- **"J$ — TRF"** instead of **"TRF TO OSJ ALTERNATIVE..."**
 
-## Root Cause
-PDF.js splits text into separate items. In Scotiabank statements, the currency prefix `J$` appears as its own text element positioned near the Credit/Debit columns. In the column assignment logic (`columnExtractor.ts`):
+Two root causes:
+1. The `cleanMergedDescription` function in `columnParser.ts` does not strip currency symbols (like `J$`) or em-dash separators (`—`)
+2. The `merchant_normalized` field in `useUploads.ts` naively takes the first 3 words of the raw description without any cleaning, so "J$" and symbols leak through
 
-1. `J$` is checked by `isAmountText()` -- it strips `J$` and finds nothing, so returns `false` (not numeric)
-2. Since it's not numeric, it falls to the non-numeric text handling
-3. It doesn't match the Date or Description column X-positions
-4. It ends up being added to `descParts` as if it were description text
+## Changes
 
-For transactions where the actual description text is on a different line or not detected, the description becomes just "J$".
+### 1. Improve `cleanMergedDescription` in `src/lib/pdf/columnParser.ts`
 
-## Fix
+Add additional regex steps to the cleaning function:
+- Strip currency symbol patterns (`J$`, `A$`, `US$`, `$`, etc.)
+- Strip em-dash characters (`—`, `–`, `--`)
+- Remove standalone punctuation and symbols
+- The existing logic to remove standalone numbers and collapse spaces stays
 
-### 1. Filter Out Currency-Symbol-Only Tokens (`columnExtractor.ts`)
+### 2. Improve `merchant_normalized` generation in `src/hooks/useUploads.ts`
 
-Add a check in `assignRowToColumns` to detect and skip standalone currency symbols before they can be added to the description. Tokens like `J$`, `A$`, `C$`, `$`, `USD`, `EUR`, etc. should be silently ignored.
+Instead of naively splitting the description into first 3 words, apply proper cleaning:
+- Strip currency symbols, numbers, and symbols from the description first
+- Use the cleaned full description (truncated to 50 chars) as the merchant name
+- This ensures entries like "STAMP DUTY TAX", "WITHHOLDING TAX", "DIGICEL" display correctly
 
-A new helper function `isCurrencySymbol()` will be added:
+### 3. Update `extractVendorName` in `src/lib/vendorExtractor.ts`
 
+Add currency symbol stripping at the start so the vendor extractor also handles "J$" prefixed strings correctly.
+
+## Technical Details
+
+### columnParser.ts - `cleanMergedDescription`
 ```
-J$, A$, C$, US$, HK$  -- currency-letter + dollar sign
-$, €, £, ¥             -- standalone symbols  
-USD, EUR, GBP, CAD, JMD -- 3-letter ISO codes
+function cleanMergedDescription(desc: string): string {
+  return desc
+    // Remove currency symbols like J$, A$, US$, $, etc.
+    .replace(/[A-Z]{0,3}\$/gi, '')
+    .replace(/[€£¥]/g, '')
+    // Remove em-dash / en-dash separators
+    .replace(/[—–]/g, '')
+    // Remove standalone numbers
+    .replace(/\b\d+\b/g, '')
+    // Remove standalone symbols (not hyphens inside words)
+    .replace(/(?<![A-Za-z])-(?![A-Za-z])/g, '')
+    // Collapse multiple spaces
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
 ```
 
-This check will be placed early in the loop, right after the empty-text check, so currency tokens never reach the description or column assignment logic.
+### useUploads.ts - merchant_normalized generation
+```
+// Clean merchant name: strip currency, numbers, symbols
+const cleanForMerchant = (desc: string) =>
+  desc
+    .replace(/[A-Z]{0,3}\$/gi, '')
+    .replace(/[€£¥]/g, '')
+    .replace(/[—–]/g, '')
+    .replace(/\b\d+\b/g, '')
+    .replace(/(?<![A-Za-z])-(?![A-Za-z])/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .substring(0, 50);
 
-### 2. Remove Incorrect Skip Patterns (`lineFilters.ts`)
+merchant_normalized: cleanForMerchant(t.description),
+```
 
-Two patterns from the line-based parser are incorrectly filtering out real transactions:
-
-- Line 15: `/^(fees?\s+charged|interest\s+charged)/i` -- "FEES CHARGED" and "INTEREST CHARGED" are real transactions with amounts
-- Line 27: `/^(stamp\s+duty|withholding\s+tax|gct|govt\s*tax)/i` -- These are real charges in Jamaican statements
-
-These will be removed so the line-based fallback parser also handles these correctly.
+### vendorExtractor.ts
+Add currency stripping as the first step:
+```
+vendor = vendor.replace(/[A-Z]{0,3}\$/g, '').trim();
+```
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/lib/pdf/columnExtractor.ts` | Add `isCurrencySymbol()` function and use it to skip currency tokens in `assignRowToColumns` |
-| `src/lib/pdf/lineFilters.ts` | Remove 2 skip patterns that filter out legitimate transactions |
+| `src/lib/pdf/columnParser.ts` | Add currency and em-dash stripping to `cleanMergedDescription` |
+| `src/hooks/useUploads.ts` | Replace naive 3-word split with proper cleaning for `merchant_normalized` |
+| `src/lib/vendorExtractor.ts` | Add currency symbol stripping |
 
-## Expected Result
-After the fix:
-- "INTEREST PAYMENT" will show as the description instead of "J$"
-- "POS PURCHASE - RESTAURANTS OF JA-ECOM KINGSTON 19 JM" will remain correct
-- "WITHHOLDING TAX", "STAMP DUTY", "GCT/GOVT TAX" will appear as transactions
-- "FEES CHARGED" and "INTEREST CHARGED" will appear as transactions
-
+## Important Note
+Existing transactions already stored in the database will still show the old descriptions. The user will need to re-upload the PDF to see the corrected descriptions, or we could add a note about that.
