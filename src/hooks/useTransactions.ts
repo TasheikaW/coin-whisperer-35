@@ -18,8 +18,8 @@ export function useTransactions() {
 
   const uploadFilter = searchParams.get('upload');
 
-  const fetchTransactions = useCallback(async () => {
-    setIsLoading(true);
+  const fetchTransactions = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
