@@ -13,6 +13,9 @@ export function extractVendorName(merchantString: string): string {
   
   let vendor = merchantString.trim().toUpperCase();
   
+  // Strip currency symbols (J$, US$, A$, $, etc.)
+  vendor = vendor.replace(/[A-Z]{0,3}\$/g, '').trim();
+  
   // Split on common separators and take first part
   // Handles: HOPP/O/123, AMAZON*ABC, STORE#123, VENDOR@LOC
   vendor = vendor.split(/[\/\*#@]/)[0].trim();

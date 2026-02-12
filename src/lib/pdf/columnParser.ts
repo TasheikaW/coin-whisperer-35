@@ -50,6 +50,11 @@ function isSkipRow(row: ColumnRow): boolean {
  */
 function cleanMergedDescription(desc: string): string {
   return desc
+    // Remove currency symbols like J$, A$, US$, $, etc.
+    .replace(/[A-Z]{0,3}\$/gi, '')
+    .replace(/[€£¥]/g, '')
+    // Remove em-dash / en-dash separators
+    .replace(/[—–]/g, '')
     // Remove standalone numbers (whole tokens that are purely digits)
     .replace(/\b\d+\b/g, '')
     // Remove standalone symbols (not hyphens inside words)
