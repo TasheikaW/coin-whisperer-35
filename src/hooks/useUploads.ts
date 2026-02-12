@@ -235,7 +235,15 @@ export function useUploads() {
           upload_id: uploadData.id,
           transaction_date: t.date,
           description_raw: t.description,
-          merchant_normalized: t.description.split(/\s+/).slice(0, 3).join(' ').substring(0, 50),
+          merchant_normalized: t.description
+            .replace(/[A-Z]{0,3}\$/gi, '')
+            .replace(/[€£¥]/g, '')
+            .replace(/[—–]/g, '')
+            .replace(/\b\d+\b/g, '')
+            .replace(/(?<![A-Za-z])-(?![A-Za-z])/g, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim()
+            .substring(0, 50),
           amount: Math.abs(t.amount),
           direction: t.direction,
           category_id: autoCategorize(t.description, t.direction),
