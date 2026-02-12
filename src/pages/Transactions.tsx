@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import {
   Search,
+  Plus,
   Filter,
   Download,
   ArrowUp,
@@ -36,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { useTransactions, Transaction } from "@/hooks/useTransactions";
 import { CategorySelect } from "@/components/transactions/CategorySelect";
 import { SaveRuleDialog } from "@/components/transactions/SaveRuleDialog";
+import { AddTransactionDialog } from "@/components/transactions/AddTransactionDialog";
 import { useToast } from "@/hooks/use-toast";
 
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -124,9 +126,12 @@ export default function Transactions() {
   };
 
   const handleRuleApplied = () => {
-    // Refresh transactions to show updated categories
-    fetchTransactions();
+    // Silent refetch to pick up rule-applied changes without resetting scroll
+    fetchTransactions(true);
   };
+
+  // Add transaction dialog state
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const filteredTransactions = useMemo(() => {
     const filtered = transactions.filter((t) => {
@@ -195,10 +200,16 @@ export default function Transactions() {
         title="Transactions"
         description="View and manage all your transactions"
         action={
-          <Button variant="outline">
-            <Download size={18} className="mr-2" />
-            Export
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => setAddDialogOpen(true)}>
+              <Plus size={18} className="mr-2" />
+              Add
+            </Button>
+            <Button variant="outline">
+              <Download size={18} className="mr-2" />
+              Export
+            </Button>
+          </div>
         }
       />
 
@@ -382,6 +393,12 @@ export default function Transactions() {
           onRuleApplied={handleRuleApplied}
         />
       )}
+
+      <AddTransactionDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        onTransactionAdded={() => fetchTransactions()}
+      />
     </AppLayout>
   );
 }
