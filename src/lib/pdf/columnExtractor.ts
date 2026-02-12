@@ -215,13 +215,19 @@ export function assignRowToColumns(
         continue;
       }
 
-      // If numeric but not near any known column — try to figure out by position
-      // Items furthest right tend to be Balance, then Credit/Debit
-      if (layout.balanceX !== null && layout.creditX !== null && layout.debitX !== null) {
-        // All three columns known — if it doesn't match any, treat as description part
-        descParts.push(text);
+      // Numeric but not near any known column — assign to closest numeric column
+      const candidates: { col: 'credit' | 'debit' | 'balance'; dist: number }[] = [];
+      if (layout.creditX !== null) candidates.push({ col: 'credit', dist: Math.abs(item.x - layout.creditX) });
+      if (layout.debitX !== null) candidates.push({ col: 'debit', dist: Math.abs(item.x - layout.debitX) });
+      if (layout.balanceX !== null) candidates.push({ col: 'balance', dist: Math.abs(item.x - layout.balanceX) });
+
+      if (candidates.length > 0) {
+        candidates.sort((a, b) => a.dist - b.dist);
+        const closest = candidates[0];
+        if (closest.col === 'balance') balanceText = text;
+        else if (closest.col === 'credit') creditText = text;
+        else debitText = text;
       } else {
-        // Fallback: treat unmatched numeric as description
         descParts.push(text);
       }
       continue;
