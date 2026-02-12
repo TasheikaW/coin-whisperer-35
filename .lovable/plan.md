@@ -1,89 +1,112 @@
 
-# Fix: Clean Descriptions and Merchant Names
 
-## Problem
-From the screenshot, transactions show descriptions like:
-- **"J$ — STAMP"** instead of **"STAMP DUTY TAX"**
-- **"J$ — 8763729167"** instead of **"DIGICEL"**
-- **"J$"** alone with no useful description
-- **"J$ — TRF"** instead of **"TRF TO OSJ ALTERNATIVE..."**
+# Fix: Remove All Symbols/Numbers from Transaction Descriptions
 
-Two root causes:
-1. The `cleanMergedDescription` function in `columnParser.ts` does not strip currency symbols (like `J$`) or em-dash separators (`—`)
-2. The `merchant_normalized` field in `useUploads.ts` naively takes the first 3 words of the raw description without any cleaning, so "J$" and symbols leak through
+## Root Cause
+
+The Scotiabank statement has columns "Transaction Date | Transaction Description | **Amount** | Balance". The column detector only looks for "Credit" / "Debit" headers -- it does NOT recognize "Amount" as a valid column. So the column parser is skipped entirely, and the **line-based parser** is used instead.
+
+The line-based parser has two problems:
+1. It joins multi-line descriptions with `" -- "` (em-dash) instead of a space
+2. Its `cleanDescription` function does NOT strip currency symbols like `J$`, standalone numbers, or symbols
+
+Additionally, the text extractor snaps Y positions to 1px precision. PDF items that are visually on the same row but differ by ~1px in Y get split into separate lines. This causes `J$` (which sits near the Amount column) to appear as its own "line", which then gets treated as description text.
 
 ## Changes
 
-### 1. Improve `cleanMergedDescription` in `src/lib/pdf/columnParser.ts`
+### 1. Enhance Column Detection (`src/lib/pdf/columnExtractor.ts`)
 
-Add additional regex steps to the cleaning function:
-- Strip currency symbol patterns (`J$`, `A$`, `US$`, `$`, etc.)
-- Strip em-dash characters (`—`, `–`, `--`)
-- Remove standalone punctuation and symbols
-- The existing logic to remove standalone numbers and collapse spaces stays
+Update `detectColumnLayout` to also recognize `"Amount"` as a valid column header. When found, map it to the `debitX` position (the `+`/`-` suffix will determine credit vs debit during parsing). This lets the column parser handle Scotiabank-style statements correctly.
 
-### 2. Improve `merchant_normalized` generation in `src/hooks/useUploads.ts`
+The detection condition changes from requiring two of (credit, debit, balance) to also accepting (amount + balance) or (amount + date).
 
-Instead of naively splitting the description into first 3 words, apply proper cleaning:
-- Strip currency symbols, numbers, and symbols from the description first
-- Use the cleaned full description (truncated to 50 chars) as the merchant name
-- This ensures entries like "STAMP DUTY TAX", "WITHHOLDING TAX", "DIGICEL" display correctly
+### 2. Handle Single "Amount" Column in Column Parser (`src/lib/pdf/columnParser.ts`)
 
-### 3. Update `extractVendorName` in `src/lib/vendorExtractor.ts`
+When the layout has a single "Amount" column (debitX set, creditX null), check the raw amount text for `+` or `-` suffix to determine direction. Currently the parser assumes separate credit/debit columns.
 
-Add currency symbol stripping at the start so the vendor extractor also handles "J$" prefixed strings correctly.
+### 3. Fix Line-Based Parser Descriptions (`src/lib/pdf/parser.ts`)
+
+As a fallback safety net:
+- Change `descParts.join(' -- ')` to `descParts.join(' ')` (space, not em-dash)
+- Update `cleanDescription` to strip currency symbols (`J$`, `US$`, `$`, etc.), standalone numbers, and standalone symbols -- matching the same logic as `cleanMergedDescription` in the column parser
+- Apply the same cleaning to the combined-line path too
+
+### 4. Improve Text Extractor Y-Snapping (`src/lib/pdf/textExtractor.ts`)
+
+Change Y-position snapping from 1px (`Math.round`) to 2px (`Math.round(y / 2) * 2`) to match the column extractor. This prevents items on the same visual row from splitting into separate lines due to sub-pixel Y differences.
 
 ## Technical Details
 
-### columnParser.ts - `cleanMergedDescription`
+### columnExtractor.ts -- detect "Amount" header
+
 ```
-function cleanMergedDescription(desc: string): string {
-  return desc
-    // Remove currency symbols like J$, A$, US$, $, etc.
-    .replace(/[A-Z]{0,3}\$/gi, '')
-    .replace(/[€£¥]/g, '')
-    // Remove em-dash / en-dash separators
-    .replace(/[—–]/g, '')
-    // Remove standalone numbers
-    .replace(/\b\d+\b/g, '')
-    // Remove standalone symbols (not hyphens inside words)
-    .replace(/(?<![A-Za-z])-(?![A-Za-z])/g, '')
-    // Collapse multiple spaces
-    .replace(/\s{2,}/g, ' ')
-    .trim();
+// In detectColumnLayout, add:
+const hasAmount = rowItems.find(i =>
+  /^amount/i.test(i.text.trim())
+);
+
+// Expand the condition:
+if ((hasCredit && hasDebit) || (hasCredit && hasBalance) || (hasDebit && hasBalance)
+    || (hasAmount && hasBalance) || (hasAmount && hasDate)) {
+  // Map "Amount" to debitX (will use +/- suffix for direction)
+  return {
+    creditX: hasCredit ? hasCredit.x : null,
+    debitX: hasDebit ? hasDebit.x : (hasAmount ? hasAmount.x : null),
+    balanceX: hasBalance ? hasBalance.x : null,
+    dateX: hasDate ? hasDate.x : null,
+    descriptionX: hasDesc ? hasDesc.x : null,
+    headerY: y,
+  };
 }
 ```
 
-### useUploads.ts - merchant_normalized generation
+### columnParser.ts -- handle +/- suffix direction
+
+When `layout.creditX` is null (single Amount column), check the raw text of the amount item for `+` or `-` suffix to determine credit/debit direction. Update `cleanAmount` to also return the sign suffix.
+
+### parser.ts -- clean descriptions
+
 ```
-// Clean merchant name: strip currency, numbers, symbols
-const cleanForMerchant = (desc: string) =>
-  desc
-    .replace(/[A-Z]{0,3}\$/gi, '')
-    .replace(/[€£¥]/g, '')
-    .replace(/[—–]/g, '')
-    .replace(/\b\d+\b/g, '')
-    .replace(/(?<![A-Za-z])-(?![A-Za-z])/g, '')
+function cleanDescription(desc: string): string {
+  return desc
+    .replace(/[A-Z]{0,3}\$/gi, '')   // Remove J$, US$, etc.
+    .replace(/[--]€£¥/g, '')           // Remove currency symbols and dashes
+    .replace(/\b\d+\b/g, '')          // Remove standalone numbers
+    .replace(/(?<![A-Za-z])-(?![A-Za-z])/g, '') // Remove standalone hyphens
     .replace(/\s{2,}/g, ' ')
-    .trim()
-    .substring(0, 50);
+    .trim();
+}
 
-merchant_normalized: cleanForMerchant(t.description),
+// Change join from em-dash to space:
+const description = descParts.join(' ');
 ```
 
-### vendorExtractor.ts
-Add currency stripping as the first step:
+### textExtractor.ts -- 2px Y-snapping
+
 ```
-vendor = vendor.replace(/[A-Z]{0,3}\$/g, '').trim();
+// Change:
+const y = Math.round(item.transform[5]);
+// To:
+const y = Math.round(item.transform[5] / 2) * 2;
 ```
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/lib/pdf/columnParser.ts` | Add currency and em-dash stripping to `cleanMergedDescription` |
-| `src/hooks/useUploads.ts` | Replace naive 3-word split with proper cleaning for `merchant_normalized` |
-| `src/lib/vendorExtractor.ts` | Add currency symbol stripping |
+| `src/lib/pdf/columnExtractor.ts` | Detect "Amount" as valid column header |
+| `src/lib/pdf/columnParser.ts` | Handle single Amount column with +/- direction |
+| `src/lib/pdf/parser.ts` | Clean descriptions properly, join with space |
+| `src/lib/pdf/textExtractor.ts` | Use 2px Y-snapping |
 
-## Important Note
-Existing transactions already stored in the database will still show the old descriptions. The user will need to re-upload the PDF to see the corrected descriptions, or we could add a note about that.
+## Expected Result
+
+After the fix:
+- "THIRD PARTY TRANSFER Transfer from DARREN CHAMBERS" (no trailing numbers)
+- "PC-BILL PAYMENT JPS CO" (no trailing numbers)  
+- "STAMP DUTY TAX" (no J$ prefix)
+- "GCT/GOVT TAX ON SERVICE CHARGE OF" (no numbers)
+- "PREPAID VOUCHER DIGICEL" (no phone numbers)
+- No blank/empty descriptions
+- No "J$" appearing anywhere in descriptions
+
