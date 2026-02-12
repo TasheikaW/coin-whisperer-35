@@ -1,12 +1,6 @@
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { TrendingUp, TrendingDown, Info } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { TrendingUp, TrendingDown } from "lucide-react";
 
 interface StatCardProps {
   title: string;
@@ -18,10 +12,26 @@ interface StatCardProps {
     value: number;
     label: string;
   };
+  iconVariant?: "green" | "red" | "blue" | "purple";
   className?: string;
 }
 
-export function StatCard({ title, value, icon, tooltip, valueColor = "default", trend, className }: StatCardProps) {
+const iconVariantStyles = {
+  green: "bg-success/15 text-success",
+  red: "bg-destructive/15 text-destructive",
+  blue: "bg-info/15 text-info",
+  purple: "bg-[hsl(262,83%,58%)]/15 text-[hsl(262,83%,58%)]",
+};
+
+export function StatCard({
+  title,
+  value,
+  icon,
+  valueColor = "default",
+  trend,
+  iconVariant = "blue",
+  className,
+}: StatCardProps) {
   const isPositive = trend && trend.value >= 0;
 
   const valueColorClass = {
@@ -33,56 +43,34 @@ export function StatCard({ title, value, icon, tooltip, valueColor = "default", 
   return (
     <div
       className={cn(
-        "stat-card group animate-fade-in",
+        "bg-card rounded-2xl p-6 border border-border/50 transition-all duration-300 hover:-translate-y-0.5 hover:border-info/40 hover:shadow-[0_8px_24px_hsl(199,89%,48%,0.12)]",
         className
       )}
     >
-      <div className="flex items-start justify-between">
-        <div className="space-y-2">
-          <div className="flex items-center gap-1.5">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            {tooltip && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info size={14} className="text-muted-foreground/60 cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="max-w-[200px] text-xs">{tooltip}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
-          <p className={cn("text-2xl lg:text-3xl font-bold tabular-nums", valueColorClass)}>
-            {value}
-          </p>
-          {trend && (
-            <div className="flex items-center gap-1.5">
-              {isPositive ? (
-                <TrendingUp size={14} className="text-success" />
-              ) : (
-                <TrendingDown size={14} className="text-destructive" />
-              )}
-              <span
-                className={cn(
-                  "text-sm font-medium",
-                  isPositive ? "text-success" : "text-destructive"
-                )}
-              >
-                {isPositive ? "+" : ""}
-                {trend.value}%
-              </span>
-              <span className="text-sm text-muted-foreground">
-                {trend.label}
-              </span>
-            </div>
-          )}
-        </div>
-        <div className="p-3 rounded-xl bg-accent/10 text-accent group-hover:bg-accent group-hover:text-accent-foreground transition-colors">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          {title}
+        </span>
+        <div className={cn("p-2.5 rounded-[10px]", iconVariantStyles[iconVariant])}>
           {icon}
         </div>
       </div>
+      <p className={cn("text-3xl lg:text-4xl font-bold tabular-nums mb-2", valueColorClass)}>
+        {value}
+      </p>
+      {trend && (
+        <div className="flex items-center gap-1.5 text-sm">
+          {isPositive ? (
+            <TrendingUp size={14} className="text-success" />
+          ) : (
+            <TrendingDown size={14} className="text-destructive" />
+          )}
+          <span className={cn("font-medium", isPositive ? "text-success" : "text-destructive")}>
+            {isPositive ? "↑" : "↓"} {Math.abs(trend.value)}%
+          </span>
+          <span className="text-muted-foreground">{trend.label}</span>
+        </div>
+      )}
     </div>
   );
 }
