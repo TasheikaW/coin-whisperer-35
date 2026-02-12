@@ -79,7 +79,7 @@ export async function extractItemsFromPdf(file: File): Promise<PageItems[]> {
 }
 
 /**
- * Detect column header positions by scanning for Credit/Debit/Balance header words.
+ * Detect column header positions by scanning for Credit/Debit/Balance/Amount header words.
  */
 export function detectColumnLayout(pages: PageItems[]): ColumnLayout | null {
   for (const page of pages) {
@@ -87,7 +87,6 @@ export function detectColumnLayout(pages: PageItems[]): ColumnLayout | null {
 
     for (const y of sortedYs) {
       const rowItems = page.rows.get(y)!;
-      const rowText = rowItems.map(i => i.text.toLowerCase().trim()).join(' ');
 
       // Check if this row contains column headers
       const hasCredit = rowItems.find(i =>
@@ -100,13 +99,16 @@ export function detectColumnLayout(pages: PageItems[]): ColumnLayout | null {
       const hasBalance = rowItems.find(i =>
         /balance/i.test(i.text.trim())
       );
+      const hasAmount = rowItems.find(i =>
+        /^amount/i.test(i.text.trim())
+      );
+      const hasDate = rowItems.find(i =>
+        /^(date|trans|post)/i.test(i.text.trim())
+      );
 
-      // Need at least credit+debit or credit+balance or debit+balance to confirm column layout
-      if ((hasCredit && hasDebit) || (hasCredit && hasBalance) || (hasDebit && hasBalance)) {
-        // Also try to detect date and description columns
-        const hasDate = rowItems.find(i =>
-          /^(date|trans|post)/i.test(i.text.trim())
-        );
+      // Need at least two recognizable columns to confirm layout
+      if ((hasCredit && hasDebit) || (hasCredit && hasBalance) || (hasDebit && hasBalance)
+          || (hasAmount && hasBalance) || (hasAmount && hasDate)) {
         const hasDesc = rowItems.find(i =>
           /^(description|details?|particular|narrative|memo)/i.test(i.text.trim())
         );
@@ -114,6 +116,7 @@ export function detectColumnLayout(pages: PageItems[]): ColumnLayout | null {
         console.log('Detected column headers at Y:', y, {
           credit: hasCredit?.x,
           debit: hasDebit?.x,
+          amount: hasAmount?.x,
           balance: hasBalance?.x,
           date: hasDate?.x,
           desc: hasDesc?.x,
@@ -121,7 +124,7 @@ export function detectColumnLayout(pages: PageItems[]): ColumnLayout | null {
 
         return {
           creditX: hasCredit ? hasCredit.x : null,
-          debitX: hasDebit ? hasDebit.x : null,
+          debitX: hasDebit ? hasDebit.x : (hasAmount ? hasAmount.x : null),
           balanceX: hasBalance ? hasBalance.x : null,
           dateX: hasDate ? hasDate.x : null,
           descriptionX: hasDesc ? hasDesc.x : null,

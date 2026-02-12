@@ -65,9 +65,13 @@ function cleanMergedDescription(desc: string): string {
 }
 
 /**
- * Clean amount text: strip currency symbols, commas, +/-, whitespace
+ * Clean amount text: strip currency symbols, commas, whitespace.
+ * Returns the numeric value and whether the raw text had a +/- suffix.
  */
-function cleanAmount(text: string): number | null {
+function cleanAmount(text: string): { value: number; signSuffix: '+' | '-' | null } | null {
+  const hasPlus = /\+\s*$/.test(text);
+  const hasMinus = /-\s*$/.test(text);
+
   const cleaned = text
     .replace(/[A-Z]{1,3}\$?/g, '')
     .replace(/[$€£¥,\s]/g, '')
@@ -78,7 +82,9 @@ function cleanAmount(text: string): number | null {
 
   if (!cleaned) return null;
   const num = parseFloat(cleaned);
-  return isNaN(num) || num <= 0 ? null : num;
+  if (isNaN(num) || num <= 0) return null;
+
+  return { value: num, signSuffix: hasPlus ? '+' : hasMinus ? '-' : null };
 }
 
 export interface ColumnParseResult {
@@ -146,9 +152,28 @@ export function parseWithColumns(
       if (isSkipRow(row)) continue;
 
       // Determine if this row has an amount
-      const creditAmt = row.creditText ? cleanAmount(row.creditText) : null;
-      const debitAmt = row.debitText ? cleanAmount(row.debitText) : null;
-      const hasAmount = creditAmt !== null || debitAmt !== null;
+      const creditResult = row.creditText ? cleanAmount(row.creditText) : null;
+      const debitResult = row.debitText ? cleanAmount(row.debitText) : null;
+      const hasAmount = creditResult !== null || debitResult !== null;
+
+      // Determine direction: if we have separate credit/debit columns, use that.
+      // If single "Amount" column (creditX is null), use +/- suffix for direction.
+      const isSingleAmountCol = layout.creditX === null && layout.debitX !== null;
+
+      function resolveAmountAndDirection(): { amount: number; direction: 'credit' | 'debit' } | null {
+        if (creditResult && debitResult) {
+          // Both present — prefer whichever is non-null (credit takes priority)
+          return { amount: creditResult.value, direction: 'credit' };
+        }
+        if (creditResult) return { amount: creditResult.value, direction: 'credit' };
+        if (debitResult) {
+          if (isSingleAmountCol && debitResult.signSuffix === '+') {
+            return { amount: debitResult.value, direction: 'credit' };
+          }
+          return { amount: debitResult.value, direction: 'debit' };
+        }
+        return null;
+      }
 
       // Try to parse date
       let parsedDate: string | null = null;
@@ -163,14 +188,12 @@ export function parseWithColumns(
       if (parsedDate && hasAmount) {
         flushPending();
 
-        const amount = creditAmt ?? debitAmt!;
-        const direction: 'credit' | 'debit' = creditAmt !== null ? 'credit' : 'debit';
-
+        const resolved = resolveAmountAndDirection()!;
         pendingTx = {
           date: parsedDate,
           descParts: row.descriptionText ? [row.descriptionText] : [],
-          amount,
-          direction,
+          amount: resolved.amount,
+          direction: resolved.direction,
         };
         continue;
       }
@@ -178,7 +201,6 @@ export function parseWithColumns(
       // ── Case 2: Row with date but no amount — might be a new transaction with amount on next line ──
       if (parsedDate && !hasAmount && row.descriptionText) {
         flushPending();
-        // Start a pending transaction without amount — will look for amount on continuation lines
         pendingTx = {
           date: parsedDate,
           descParts: [row.descriptionText],
@@ -190,14 +212,15 @@ export function parseWithColumns(
 
       // ── Case 3: No date — continuation of previous transaction ──
       if (!parsedDate && pendingTx) {
-        // Append description
         if (row.descriptionText) {
           pendingTx.descParts.push(row.descriptionText);
         }
-        // If this continuation line has an amount and the pending tx doesn't, use it
         if (hasAmount && pendingTx.amount === 0) {
-          pendingTx.amount = creditAmt ?? debitAmt!;
-          pendingTx.direction = creditAmt !== null ? 'credit' : 'debit';
+          const resolved = resolveAmountAndDirection();
+          if (resolved) {
+            pendingTx.amount = resolved.amount;
+            pendingTx.direction = resolved.direction;
+          }
         }
         continue;
       }

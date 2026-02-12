@@ -13,11 +13,20 @@ import { parseWithColumns } from './columnParser';
  */
 function cleanDescription(desc: string): string {
   return desc
+    // Remove currency symbols like J$, A$, US$, $, etc.
+    .replace(/[A-Z]{0,3}\$/gi, '')
+    .replace(/[€£¥]/g, '')
+    // Remove em-dash / en-dash separators
+    .replace(/[—–]/g, '')
+    // Remove standalone numbers
+    .replace(/\b\d+\b/g, '')
+    // Remove standalone hyphens (not inside words)
+    .replace(/(?<![A-Za-z])-(?![A-Za-z])/g, '')
+    // Collapse multiple spaces
     .replace(/\s{2,}/g, ' ')
     // Remove posting date at start  (e.g. "01/15 " or "Jan 15 ")
     .replace(/^\d{1,2}\/\d{1,2}\s*/, '')
     .replace(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s*/i, '')
-    .replace(/\s+$/, '')
     .trim();
 }
 
@@ -147,7 +156,7 @@ export async function parsePdf(file: File): Promise<PdfParseResult> {
             j++;
           }
 
-          const description = descParts.join(' — ');
+          const description = descParts.join(' ');
           const direction = detectDirection(
             description,
             amountResult.isCredit,
