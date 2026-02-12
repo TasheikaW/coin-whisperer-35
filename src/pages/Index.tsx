@@ -42,7 +42,7 @@ const Index = () => {
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent to-success flex items-center justify-center shadow-glow">
                 <Wallet size={28} className="text-white" />
               </div>
-              <span className="text-3xl font-bold text-white">BudgetFlow</span>
+              <span className="text-3xl font-bold text-white">Fundza</span>
             </div>
 
             {/* Headline */}
@@ -143,10 +143,10 @@ const Index = () => {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <Wallet size={20} className="text-accent" />
-              <span className="font-semibold text-foreground">BudgetFlow</span>
+              <span className="font-semibold text-foreground">Fundza</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              © 2024 BudgetFlow. All rights reserved.
+              © 2024 Fundza. All rights reserved.
             </p>
           </div>
         </div>
