@@ -3,74 +3,21 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Zap, Crown, Sparkles, Settings, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useSubscription, PlanKey } from "@/hooks/useSubscription";
+import { Check, Zap, Sparkles, Settings, Loader2 } from "lucide-react";
+import { useSubscription } from "@/hooks/useSubscription";
 import { useSearchParams } from "react-router-dom";
 import { useEffect } from "react";
 import { toast } from "@/components/ui/sonner";
 
-const plans: {
-  key: PlanKey;
-  name: string;
-  price: string;
-  period: string;
-  description: string;
-  features: string[];
-  limitations?: string[];
-  popular?: boolean;
-}[] = [
-  {
-    key: "free",
-    name: "Free",
-    price: "$0",
-    period: "/month",
-    description: "Perfect for getting started",
-    features: [
-      "5 uploads per month",
-      "100 transactions stored",
-      "Basic categorization",
-      "Monthly dashboard",
-      "CSV export",
-    ],
-    limitations: [
-      "No AI insights",
-      "No advanced reports",
-    ],
-  },
-  {
-    key: "pro",
-    name: "Pro",
-    price: "$9.99",
-    period: "/month",
-    description: "For power users who want it all",
-    features: [
-      "Unlimited uploads",
-      "Unlimited transactions",
-      "AI-powered categorization",
-      "Smart insights",
-      "Advanced reports",
-      "Priority support",
-      "Custom categories",
-      "Multiple currencies",
-    ],
-    popular: true,
-  },
-  {
-    key: "family",
-    name: "Family",
-    price: "$19.99",
-    period: "/month",
-    description: "Share with up to 5 family members",
-    features: [
-      "Everything in Pro",
-      "5 user accounts",
-      "Shared budgets",
-      "Family dashboard",
-      "Parental controls",
-      "Premium support",
-    ],
-  },
+const features = [
+  "Unlimited uploads",
+  "Unlimited transactions",
+  "AI-powered categorization",
+  "Smart insights",
+  "Advanced reports",
+  "Priority support",
+  "Custom categories",
+  "Multiple currencies",
 ];
 
 export default function Subscription() {
@@ -86,40 +33,11 @@ export default function Subscription() {
     }
   }, [searchParams, checkSubscription]);
 
-  const getButtonProps = (planKey: PlanKey) => {
-    const isCurrent = currentPlan === planKey;
-
-    if (isCurrent) {
-      return {
-        text: "Current Plan",
-        variant: "secondary" as const,
-        disabled: true,
-        onClick: () => {},
-      };
-    }
-
-    if (planKey === "free") {
-      return {
-        text: subscribed ? "Manage Subscription" : "Current Plan",
-        variant: "outline" as const,
-        disabled: !subscribed,
-        onClick: openPortal,
-      };
-    }
-
-    return {
-      text: `Upgrade to ${planKey === "pro" ? "Pro" : "Family"}`,
-      variant: "default" as const,
-      disabled: false,
-      onClick: () => startCheckout(planKey as "pro" | "family"),
-    };
-  };
-
   return (
     <AppLayout>
       <PageHeader
         title="Subscription"
-        description="Choose the plan that works best for you"
+        description="Unlock the full power of Fundza"
       />
 
       {/* Current Status */}
@@ -132,12 +50,12 @@ export default function Subscription() {
               </div>
               <div>
                 <p className="font-semibold text-foreground">
-                  {isLoading ? "Loading..." : `${plans.find(p => p.key === currentPlan)?.name} Plan`}
+                  {isLoading ? "Loading..." : subscribed ? "Pro Plan" : "No active subscription"}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {subscriptionEnd
                     ? `Renews on ${new Date(subscriptionEnd).toLocaleDateString()}`
-                    : "Free tier"}
+                    : "Subscribe to get started"}
                 </p>
               </div>
             </div>
@@ -151,77 +69,49 @@ export default function Subscription() {
         </CardContent>
       </Card>
 
-      {/* Plans Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {plans.map((plan) => {
-          const isCurrent = currentPlan === plan.key;
-          const btnProps = getButtonProps(plan.key);
-
-          return (
-            <Card
-              key={plan.name}
-              className={cn(
-                "relative overflow-hidden transition-all",
-                plan.popular && "border-accent shadow-glow",
-                isCurrent && "border-accent/50 ring-2 ring-accent/20"
-              )}
-            >
-              {plan.popular && (
-                <div className="absolute top-0 right-0 bg-accent text-accent-foreground text-xs font-medium px-3 py-1 rounded-bl-lg">
-                  <div className="flex items-center gap-1">
-                    <Crown size={12} />
-                    Most Popular
-                  </div>
-                </div>
-              )}
-              {isCurrent && (
-                <div className="absolute top-0 left-0 bg-accent text-accent-foreground text-xs font-medium px-3 py-1 rounded-br-lg">
-                  Your Plan
-                </div>
-              )}
-              <CardHeader>
-                <CardTitle className="flex items-baseline gap-1">
-                  <span className="text-3xl font-bold">{plan.price}</span>
-                  <span className="text-muted-foreground font-normal">{plan.period}</span>
-                </CardTitle>
-                <CardDescription>
-                  <span className="text-lg font-semibold text-foreground">{plan.name}</span>
-                  <br />
-                  {plan.description}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <ul className="space-y-3">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-3">
-                      <Check size={18} className="text-success flex-shrink-0 mt-0.5" />
-                      <span className="text-sm text-foreground">{feature}</span>
-                    </li>
-                  ))}
-                  {plan.limitations?.map((limitation) => (
-                    <li key={limitation} className="flex items-start gap-3 opacity-50">
-                      <span className="w-[18px] text-center text-muted-foreground">—</span>
-                      <span className="text-sm text-muted-foreground line-through">{limitation}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button
-                  className="w-full"
-                  variant={btnProps.variant}
-                  disabled={btnProps.disabled || isLoading}
-                  onClick={btnProps.onClick}
-                >
-                  {isLoading ? (
-                    <Loader2 size={16} className="animate-spin mr-2" />
-                  ) : plan.popular && !isCurrent ? (
-                    <Sparkles size={16} className="mr-2" />
-                  ) : null}
-                  {btnProps.text}
-                </Button>
-              </CardContent>
-            </Card>
-          );
-        })}
+      {/* Single Plan Card */}
+      <div className="max-w-md mx-auto">
+        <Card className="relative overflow-hidden border-accent shadow-glow">
+          <CardHeader>
+            <CardTitle className="flex items-baseline gap-1">
+              <span className="text-3xl font-bold">$9.99</span>
+              <span className="text-muted-foreground font-normal">/month</span>
+            </CardTitle>
+            <CardDescription>
+              <span className="text-lg font-semibold text-foreground">Fundza Pro</span>
+              <br />
+              Everything you need to manage your finances
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <ul className="space-y-3">
+              {features.map((feature) => (
+                <li key={feature} className="flex items-start gap-3">
+                  <Check size={18} className="text-success flex-shrink-0 mt-0.5" />
+                  <span className="text-sm text-foreground">{feature}</span>
+                </li>
+              ))}
+            </ul>
+            {subscribed ? (
+              <Badge variant="secondary" className="w-full justify-center py-2 text-sm">
+                ✓ You're subscribed
+              </Badge>
+            ) : (
+              <Button
+                className="w-full"
+                disabled={isLoading}
+                onClick={() => startCheckout("pro")}
+              >
+                {isLoading ? (
+                  <Loader2 size={16} className="animate-spin mr-2" />
+                ) : (
+                  <Sparkles size={16} className="mr-2" />
+                )}
+                Subscribe Now
+              </Button>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* FAQ */}
