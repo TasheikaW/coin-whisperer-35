@@ -88,7 +88,7 @@ export function AppSidebar() {
           </div>
           {!collapsed && (
             <span className="text-lg font-semibold text-sidebar-foreground">
-              BudgetFlow
+              Fundza
             </span>
           )}
         </div>

@@ -111,7 +111,7 @@ export default function Auth() {
       } else {
         toast({
           title: "Account created!",
-          description: "Welcome to BudgetFlow. Let's get started!",
+          description: "Welcome to Fundza. Let's get started!",
         });
         navigate("/dashboard");
       }
@@ -160,7 +160,7 @@ export default function Auth() {
                 <Wallet size={24} className="text-white" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold">BudgetFlow</CardTitle>
+            <CardTitle className="text-2xl font-bold">Fundza</CardTitle>
             <CardDescription>
               Take control of your financial future
             </CardDescription>
