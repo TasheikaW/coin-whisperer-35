@@ -21,7 +21,7 @@ export async function extractTextFromPdf(file: File): Promise<string[]> {
 
     for (const item of textContent.items) {
       if (!('str' in item)) continue;
-      const y = Math.round(item.transform[5]); // Y position
+      const y = Math.round(item.transform[5] / 2) * 2; // Y position (2px snap to match column extractor)
       const x = item.transform[4]; // X position
       if (!lineMap.has(y)) lineMap.set(y, []);
       lineMap.get(y)!.push({ x, text: item.str });
