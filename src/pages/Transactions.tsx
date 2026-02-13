@@ -39,6 +39,8 @@ import { CategorySelect } from "@/components/transactions/CategorySelect";
 import { SaveRuleDialog } from "@/components/transactions/SaveRuleDialog";
 import { AddTransactionDialog } from "@/components/transactions/AddTransactionDialog";
 import { useToast } from "@/hooks/use-toast";
+import { DateRangeFilter, type DatePreset } from "@/components/shared/DateRangeFilter";
+import { startOfMonth, endOfMonth, parseISO } from "date-fns";
 
 const categoryIcons: Record<string, React.ReactNode> = {
   Shopping: <ShoppingCart size={16} />,
@@ -73,6 +75,8 @@ export default function Transactions() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [showTransfers, setShowTransfers] = useState(true);
+  const [datePreset, setDatePreset] = useState<DatePreset>("all");
+  const [dateRange, setDateRange] = useState<{ start: Date | null; end: Date | null }>({ start: null, end: null });
   
   // Sorting state
   type SortField = 'date' | 'description' | 'category' | 'source' | 'amount';
@@ -137,6 +141,11 @@ export default function Transactions() {
     const filtered = transactions.filter((t) => {
       if (!showTransfers && t.is_transfer) return false;
       if (categoryFilter !== "all" && t.categories?.name !== categoryFilter) return false;
+      if (dateRange.start || dateRange.end) {
+        const txDate = parseISO(t.transaction_date);
+        if (dateRange.start && txDate < dateRange.start) return false;
+        if (dateRange.end && txDate > dateRange.end) return false;
+      }
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const matchesDescription = t.description_raw.toLowerCase().includes(query);
@@ -235,7 +244,7 @@ export default function Transactions() {
 
       {/* Filters */}
       <Card className="mb-6">
-        <CardContent className="py-4">
+        <CardContent className="py-4 space-y-4">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
@@ -273,6 +282,12 @@ export default function Transactions() {
               </Button>
             </div>
           </div>
+          <DateRangeFilter
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+            preset={datePreset}
+            onPresetChange={setDatePreset}
+          />
         </CardContent>
       </Card>
 

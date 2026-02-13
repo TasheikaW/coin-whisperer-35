@@ -24,7 +24,7 @@ interface BudgetProgress {
   budget: number;
 }
 
-export function useDashboardData() {
+export function useDashboardData(dateFilter?: { start: Date | null; end: Date | null }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -37,8 +37,7 @@ export function useDashboardData() {
       return;
     }
 
-    // Fetch all transactions (no date filter for now to catch all data)
-    const { data } = await supabase
+    let query = supabase
       .from('transactions')
       .select(`
         *,
@@ -47,10 +46,18 @@ export function useDashboardData() {
       .order('transaction_date', { ascending: false })
       .limit(1000);
 
+    if (dateFilter?.start) {
+      query = query.gte('transaction_date', dateFilter.start.toISOString().split('T')[0]);
+    }
+    if (dateFilter?.end) {
+      query = query.lte('transaction_date', dateFilter.end.toISOString().split('T')[0]);
+    }
+
+    const { data } = await query;
 
     setTransactions(data || []);
     setIsLoading(false);
-  }, []);
+  }, [dateFilter?.start?.getTime(), dateFilter?.end?.getTime()]);
 
   useEffect(() => {
     fetchTransactions();
