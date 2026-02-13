@@ -47,9 +47,11 @@ serve(async (req) => {
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    return new Response(JSON.stringify({ error: msg }), {
+    console.error('[CUSTOMER-PORTAL] Error:', msg);
+    const isUserError = msg.includes("not authenticated") || msg.includes("No authorization") || msg.includes("No Stripe customer");
+    return new Response(JSON.stringify({ error: isUserError ? msg : "An error occurred processing your request. Please try again later." }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: isUserError ? 400 : 500,
     });
   }
 });

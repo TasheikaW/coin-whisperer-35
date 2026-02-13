@@ -83,9 +83,10 @@ serve(async (req) => {
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: msg });
-    return new Response(JSON.stringify({ error: msg }), {
+    const isUserError = msg.includes("not authenticated") || msg.includes("No authorization") || msg.includes("not set");
+    return new Response(JSON.stringify({ error: isUserError ? msg : "An error occurred processing your request. Please try again later." }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: isUserError ? 401 : 500,
     });
   }
 });
