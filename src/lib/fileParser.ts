@@ -138,7 +138,7 @@ const detectColumns = (headers: string[]): ColumnMapping => {
   const balanceCol = findColumn(['balance', 'running', 'available']);
   
   // Type column (might indicate debit/credit)
-  const typeCol = findColumn(['type', 'dr/cr', 'dc']);
+  const typeCol = findColumn(['type', 'dr/cr', 'dc'], ['account', 'file', 'content', 'mime']);
   
   // Account type column (to detect credit card statements)
   const accountTypeCol = findColumn(['account type', 'account']);
