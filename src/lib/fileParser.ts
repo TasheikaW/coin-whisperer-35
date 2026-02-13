@@ -174,6 +174,9 @@ const parseDirectionFromType = (value: string | undefined | null): 'debit' | 'cr
 };
 
 
+const MAX_TRANSACTIONS = 10000;
+const MAX_DESCRIPTION_LENGTH = 500;
+
 export const parseCSV = async (file: File): Promise<ParseResult> => {
   try {
     const text = await file.text();
@@ -181,6 +184,10 @@ export const parseCSV = async (file: File): Promise<ParseResult> => {
     
     if (lines.length < 2) {
       return { success: false, transactions: [], error: 'File appears to be empty or has no data rows' };
+    }
+    
+    if (lines.length - 1 > MAX_TRANSACTIONS) {
+      return { success: false, transactions: [], error: `File exceeds maximum of ${MAX_TRANSACTIONS} transactions` };
     }
     
     // Parse headers - handle quoted headers
@@ -199,7 +206,7 @@ export const parseCSV = async (file: File): Promise<ParseResult> => {
       const values = parseCSVLine(line);
       
       const date = parseDate(values[columns.dateCol]);
-      let description = values[columns.descCol]?.replace(/^"|"$/g, '').trim() || '';
+      let description = values[columns.descCol]?.replace(/^"|"$/g, '').trim().substring(0, MAX_DESCRIPTION_LENGTH) || '';
       
       // If description is empty, try to find any non-empty text field
       if (!description) {
@@ -307,6 +314,10 @@ export const parseXLSX = async (file: File): Promise<ParseResult> => {
       return { success: false, transactions: [], error: 'File appears to be empty or has no data rows' };
     }
     
+    if (data.length - 1 > MAX_TRANSACTIONS) {
+      return { success: false, transactions: [], error: `File exceeds maximum of ${MAX_TRANSACTIONS} transactions` };
+    }
+    
     const headers = (data[0] || []).map(h => String(h || ''));
     const columns = detectColumns(headers);
     
@@ -319,7 +330,7 @@ export const parseXLSX = async (file: File): Promise<ParseResult> => {
       if (!row || row.length === 0 || row.every(cell => !cell)) continue;
       
       const date = parseDate(row[columns.dateCol]);
-      let description = String(row[columns.descCol] || '').trim();
+      let description = String(row[columns.descCol] || '').trim().substring(0, MAX_DESCRIPTION_LENGTH);
       
       // If description is empty, try to find any non-empty text field
       if (!description) {
