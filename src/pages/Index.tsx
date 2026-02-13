@@ -1,7 +1,8 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Wallet, ArrowRight, BarChart3, Upload, PiggyBank, Shield } from "lucide-react";
+import { Wallet, ArrowRight, BarChart3, Upload, PiggyBank, Shield, LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 const features = [
   {
@@ -27,9 +28,53 @@ const features = [
 ];
 
 const Index = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast({
+      title: "Signed out",
+      description: "You have been signed out successfully.",
+    });
+    navigate("/auth");
+  };
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Top Nav Bar */}
+      <div className="absolute top-0 left-0 right-0 z-10">
+        <div className="container max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Wallet size={20} className="text-white" />
+            <span className="font-semibold text-white">Fundza</span>
+          </div>
+          <div className="flex items-center gap-3">
+            {isAuthenticated ? (
+              <>
+                <span className="text-sm text-white/70 hidden sm:inline">{user?.email}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSignOut}
+                  className="border-white/20 text-white hover:bg-white/10"
+                >
+                  <LogOut size={16} className="mr-2" />
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <Link to="/auth">
+                <Button variant="outline" size="sm" className="border-white/20 text-white hover:bg-white/10">
+                  Sign In
+                </Button>
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 gradient-bg opacity-95" />

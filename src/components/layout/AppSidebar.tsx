@@ -67,7 +67,7 @@ export function AppSidebar() {
       title: "Signed out",
       description: "You have been signed out successfully.",
     });
-    navigate("/");
+    navigate("/auth");
   };
 
   return (
