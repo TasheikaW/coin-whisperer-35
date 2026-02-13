@@ -9,7 +9,14 @@ import { useSearchParams } from "react-router-dom";
 import { useEffect } from "react";
 import { toast } from "@/components/ui/sonner";
 
-const features = [
+const freeFeatures = [
+  "5 uploads per month",
+  "100 transactions",
+  "Basic categorization",
+  "Monthly summary report",
+];
+
+const proFeatures = [
   "Unlimited uploads",
   "Unlimited transactions",
   "AI-powered categorization",
@@ -69,9 +76,50 @@ export default function Subscription() {
         </CardContent>
       </Card>
 
-      {/* Single Plan Card */}
-      <div className="max-w-md mx-auto">
-        <Card className="relative overflow-hidden border-accent shadow-glow">
+      {/* Plan Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+        {/* Free Plan */}
+        <Card className={`relative overflow-hidden ${currentPlan === "free" ? "border-accent shadow-glow" : ""}`}>
+          {currentPlan === "free" && (
+            <Badge className="absolute top-4 right-4 bg-accent text-accent-foreground">Current Plan</Badge>
+          )}
+          <CardHeader>
+            <CardTitle className="flex items-baseline gap-1">
+              <span className="text-3xl font-bold">$0</span>
+              <span className="text-muted-foreground font-normal">/month</span>
+            </CardTitle>
+            <CardDescription>
+              <span className="text-lg font-semibold text-foreground">Free</span>
+              <br />
+              Get started with the basics
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <ul className="space-y-3">
+              {freeFeatures.map((feature) => (
+                <li key={feature} className="flex items-start gap-3">
+                  <Check size={18} className="text-success flex-shrink-0 mt-0.5" />
+                  <span className="text-sm text-foreground">{feature}</span>
+                </li>
+              ))}
+            </ul>
+            {currentPlan === "free" ? (
+              <Badge variant="secondary" className="w-full justify-center py-2 text-sm">
+                ✓ Your current plan
+              </Badge>
+            ) : (
+              <Button variant="outline" className="w-full" disabled>
+                Downgrade via Manage Subscription
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Pro Plan */}
+        <Card className={`relative overflow-hidden ${currentPlan === "pro" ? "border-accent shadow-glow" : "border-accent/50"}`}>
+          {currentPlan === "pro" && (
+            <Badge className="absolute top-4 right-4 bg-accent text-accent-foreground">Current Plan</Badge>
+          )}
           <CardHeader>
             <CardTitle className="flex items-baseline gap-1">
               <span className="text-3xl font-bold">$9.99</span>
@@ -85,14 +133,14 @@ export default function Subscription() {
           </CardHeader>
           <CardContent className="space-y-6">
             <ul className="space-y-3">
-              {features.map((feature) => (
+              {proFeatures.map((feature) => (
                 <li key={feature} className="flex items-start gap-3">
                   <Check size={18} className="text-success flex-shrink-0 mt-0.5" />
                   <span className="text-sm text-foreground">{feature}</span>
                 </li>
               ))}
             </ul>
-            {subscribed ? (
+            {currentPlan === "pro" ? (
               <Badge variant="secondary" className="w-full justify-center py-2 text-sm">
                 ✓ You're subscribed
               </Badge>
