@@ -8,8 +8,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AddCategoryDialog } from '@/components/categories/AddCategoryDialog';
 
 interface Category {
   id: string;
@@ -48,18 +49,18 @@ const categoryColors: Record<string, string> = {
 export function CategorySelect({ value, categoryName, onSelect, compact = false }: CategorySelectProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+
+  const fetchCategories = async () => {
+    const { data } = await supabase
+      .from('categories')
+      .select('*')
+      .order('name');
+    setCategories(data || []);
+    setIsLoading(false);
+  };
 
   useEffect(() => {
-    const fetchCategories = async () => {
-      const { data } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name');
-      
-      setCategories(data || []);
-      setIsLoading(false);
-    };
-
     fetchCategories();
   }, []);
 
@@ -71,36 +72,53 @@ export function CategorySelect({ value, categoryName, onSelect, compact = false 
   const colorClass = categoryColors[displayName] || 'bg-muted text-muted-foreground';
 
   const handleChange = (categoryId: string) => {
+    if (categoryId === '__new__') {
+      setAddDialogOpen(true);
+      return;
+    }
     const selectedCategory = categories.find(c => c.id === categoryId);
     onSelect(categoryId, selectedCategory?.name || 'Uncategorized');
   };
 
   return (
-    <Select value={value || ''} onValueChange={handleChange}>
-      <SelectTrigger className={cn(
-        "h-auto border-0 p-0 shadow-none focus:ring-0",
-        compact && "w-auto"
-      )}>
-        <Badge
-          variant="secondary"
-          className={cn("flex items-center gap-1.5 cursor-pointer hover:opacity-80", colorClass)}
-        >
-          {displayName}
-        </Badge>
-      </SelectTrigger>
-      <SelectContent>
-        {categories.map((category) => (
-          <SelectItem key={category.id} value={category.id}>
-            <div className="flex items-center gap-2">
-              <span
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: category.color || '#94a3b8' }}
-              />
-              {category.name}
+    <>
+      <Select value={value || ''} onValueChange={handleChange}>
+        <SelectTrigger className={cn(
+          "h-auto border-0 p-0 shadow-none focus:ring-0",
+          compact && "w-auto"
+        )}>
+          <Badge
+            variant="secondary"
+            className={cn("flex items-center gap-1.5 cursor-pointer hover:opacity-80", colorClass)}
+          >
+            {displayName}
+          </Badge>
+        </SelectTrigger>
+        <SelectContent>
+          {categories.map((category) => (
+            <SelectItem key={category.id} value={category.id}>
+              <div className="flex items-center gap-2">
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: category.color || '#94a3b8' }}
+                />
+                {category.name}
+              </div>
+            </SelectItem>
+          ))}
+          <SelectItem value="__new__">
+            <div className="flex items-center gap-2 text-accent">
+              <Plus size={14} />
+              New Category
             </div>
           </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+        </SelectContent>
+      </Select>
+      <AddCategoryDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        onCategoryAdded={fetchCategories}
+      />
+    </>
   );
 }

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { SpendingChart } from "@/components/dashboard/SpendingChart";
@@ -17,9 +18,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useNavigate } from "react-router-dom";
+import { DateRangeFilter, type DatePreset } from "@/components/shared/DateRangeFilter";
 
 export default function Dashboard() {
-  const { isLoading, stats, savingsRate, spendingByCategory, monthlyTrends, transactionCount } = useDashboardData();
+  const [datePreset, setDatePreset] = useState<DatePreset>("all");
+  const [dateRange, setDateRange] = useState<{ start: Date | null; end: Date | null }>({ start: null, end: null });
+  const { isLoading, stats, savingsRate, spendingByCategory, monthlyTrends, transactionCount } = useDashboardData(dateRange);
   const navigate = useNavigate();
 
   const formatCurrency = (amount: number) =>
@@ -71,9 +75,17 @@ export default function Dashboard() {
   return (
     <AppLayout>
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl lg:text-4xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Track your spending and financial health</p>
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl lg:text-4xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Track your spending and financial health</p>
+        </div>
+        <DateRangeFilter
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
+          preset={datePreset}
+          onPresetChange={setDatePreset}
+        />
       </div>
 
       {/* Metrics Grid */}
