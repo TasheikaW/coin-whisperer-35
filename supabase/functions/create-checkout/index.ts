@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+import { z } from "npm:zod@3.22.4";
+
+const CreateCheckoutSchema = z.object({
+  priceId: z.string().startsWith('price_').min(10).max(100),
+});
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -32,8 +37,15 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { email: user.email });
 
-    const { priceId } = await req.json();
-    if (!priceId) throw new Error("No priceId provided");
+    const body = await req.json();
+    const parseResult = CreateCheckoutSchema.safeParse(body);
+    if (!parseResult.success) {
+      return new Response(JSON.stringify({ error: "Invalid input parameters" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
+    const { priceId } = parseResult.data;
     logStep("Price ID received", { priceId });
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { apiVersion: "2025-08-27.basil" });
@@ -63,7 +75,7 @@ serve(async (req) => {
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: msg });
-    const isUserError = msg.includes("not authenticated") || msg.includes("No priceId");
+    const isUserError = msg.includes("not authenticated");
     return new Response(JSON.stringify({ error: isUserError ? msg : "An error occurred processing your request. Please try again later." }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: isUserError ? 400 : 500,
