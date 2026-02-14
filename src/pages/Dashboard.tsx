@@ -149,7 +149,11 @@ export default function Dashboard() {
           <h2 className="text-2xl font-semibold text-foreground mb-4">Top Merchants</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {topMerchants.map((merchant, index) => (
-              <Card key={merchant.name} className="border-border/50">
+              <Card
+                key={merchant.name}
+                className="border-border/50 cursor-pointer hover:border-primary/40 transition-colors"
+                onClick={() => navigate(`/transactions?merchant=${encodeURIComponent(merchant.name)}`)}
+              >
                 <CardContent className="pt-6">
                   <div className="flex items-start gap-3">
                     <div className={`p-2 rounded-lg ${
