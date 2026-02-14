@@ -44,7 +44,7 @@ export default function Subscription() {
     <AppLayout>
       <PageHeader
         title="Subscription"
-        description="Unlock the full power of Fundza"
+        description="Unlock the full power of Coin Whisperer"
       />
 
       {/* Current Status */}
@@ -126,7 +126,7 @@ export default function Subscription() {
               <span className="text-muted-foreground font-normal">/month</span>
             </CardTitle>
             <CardDescription>
-              <span className="text-lg font-semibold text-foreground">Fundza Pro</span>
+              <span className="text-lg font-semibold text-foreground">Coin Whisperer Pro</span>
               <br />
               Everything you need to manage your finances
             </CardDescription>

@@ -48,7 +48,7 @@ const Index = () => {
         <div className="container max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Wallet size={20} className="text-white" />
-            <span className="font-semibold text-white">Fundza</span>
+            <span className="font-semibold text-white">Coin Whisperer</span>
           </div>
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
@@ -84,10 +84,10 @@ const Index = () => {
           <div className="flex flex-col items-center text-center">
             {/* Logo */}
             <div className="flex items-center gap-3 mb-8">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent to-success flex items-center justify-center shadow-glow">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent to-info flex items-center justify-center shadow-glow">
                 <Wallet size={28} className="text-white" />
               </div>
-              <span className="text-3xl font-bold text-white">Fundza</span>
+              <span className="text-3xl font-bold text-white">Coin Whisperer</span>
             </div>
 
             {/* Headline */}
@@ -188,10 +188,10 @@ const Index = () => {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <Wallet size={20} className="text-accent" />
-              <span className="font-semibold text-foreground">Fundza</span>
+              <span className="font-semibold text-foreground">Coin Whisperer</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              © 2024 Fundza. All rights reserved.
+              © 2025 Coin Whisperer. All rights reserved.
             </p>
           </div>
         </div>
