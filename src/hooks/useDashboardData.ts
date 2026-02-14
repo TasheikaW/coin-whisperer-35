@@ -98,6 +98,23 @@ export function useDashboardData(dateFilter?: { start: Date | null; end: Date | 
     .sort((a, b) => b.value - a.value)
     .slice(0, 6);
 
+  // Top merchants by total spend
+  const topMerchants = transactions
+    .filter(t => t.direction === 'debit' && !t.is_transfer)
+    .reduce((acc, t) => {
+      const merchant = t.merchant_normalized || t.description_raw || 'Unknown';
+      const existing = acc.find(m => m.name === merchant);
+      if (existing) {
+        existing.total += t.amount;
+        existing.count += 1;
+      } else {
+        acc.push({ name: merchant, total: t.amount, count: 1 });
+      }
+      return acc;
+    }, [] as { name: string; total: number; count: number }[])
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 3);
+
   // Monthly trends
   const monthlyTrends: MonthlyTrend[] = [];
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -129,6 +146,7 @@ export function useDashboardData(dateFilter?: { start: Date | null; end: Date | 
     savingsRate,
     spendingByCategory,
     monthlyTrends,
+    topMerchants,
     transactionCount: transactions.length,
     refetch: fetchTransactions,
   };

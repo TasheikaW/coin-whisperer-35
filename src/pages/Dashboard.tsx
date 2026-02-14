@@ -13,6 +13,7 @@ import {
   Plus,
   Target,
   Download,
+  Store,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ import { DateRangeFilter, type DatePreset } from "@/components/shared/DateRangeF
 export default function Dashboard() {
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [dateRange, setDateRange] = useState<{ start: Date | null; end: Date | null }>({ start: null, end: null });
-  const { isLoading, stats, savingsRate, spendingByCategory, monthlyTrends, transactionCount } = useDashboardData(dateRange);
+  const { isLoading, stats, savingsRate, spendingByCategory, monthlyTrends, topMerchants, transactionCount } = useDashboardData(dateRange);
   const navigate = useNavigate();
 
   const formatCurrency = (amount: number) =>
@@ -141,6 +142,42 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Top 3 Merchants */}
+      {topMerchants.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-2xl font-semibold text-foreground mb-4">Top Merchants</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {topMerchants.map((merchant, index) => (
+              <Card key={merchant.name} className="border-border/50">
+                <CardContent className="pt-6">
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${
+                      index === 0 ? 'bg-destructive/10 text-destructive' :
+                      index === 1 ? 'bg-warning/10 text-warning' :
+                      'bg-muted text-muted-foreground'
+                    }`}>
+                      <Store size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-muted-foreground">#{index + 1}</p>
+                      <p className="font-semibold text-foreground truncate" title={merchant.name}>
+                        {merchant.name}
+                      </p>
+                      <p className="text-lg font-bold text-foreground mt-1">
+                        {formatCurrency(merchant.total)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {merchant.count} transaction{merchant.count !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Smart Insights */}
       <div className="mb-8">
