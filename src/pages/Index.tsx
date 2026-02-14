@@ -119,7 +119,7 @@ const Index = () => {
                       <ArrowRight size={18} className="ml-2" />
                     </Button>
                   </Link>
-                  <Link to="/dashboard">
+                  <Link to="/demo">
                     <Button size="lg" variant="outline" className="border-white/20 text-white hover:bg-white/10 h-12">
                       View Demo
                     </Button>
@@ -137,44 +137,46 @@ const Index = () => {
       </div>
 
       {/* Features Section */}
-      <div className="container max-w-6xl mx-auto px-4 py-24">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl lg:text-4xl font-bold text-foreground">
-            Everything You Need to Budget Smarter
-          </h2>
-          <p className="text-muted-foreground mt-4 max-w-2xl mx-auto">
-            Powerful features designed to make managing your money effortless
-          </p>
-        </div>
+      <div className="gradient-bg">
+        <div className="container max-w-6xl mx-auto px-4 py-24">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl lg:text-4xl font-bold text-white">
+              Everything You Need to Budget Smarter
+            </h2>
+            <p className="text-white/60 mt-4 max-w-2xl mx-auto">
+              Powerful features designed to make managing your money effortless
+            </p>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {features.map((feature, index) => (
-            <div
-              key={feature.title}
-              className="stat-card animate-fade-in"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <div className="p-3 rounded-xl bg-accent/10 w-fit mb-4">
-                <feature.icon className="text-accent" size={24} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {features.map((feature, index) => (
+              <div
+                key={feature.title}
+                className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6 transition-all duration-200 hover:bg-white/10"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <div className="p-3 rounded-xl bg-accent/20 w-fit mb-4">
+                  <feature.icon className="text-accent" size={24} />
+                </div>
+                <h3 className="font-semibold text-white mb-2">{feature.title}</h3>
+                <p className="text-sm text-white/60">{feature.description}</p>
               </div>
-              <h3 className="font-semibold text-foreground mb-2">{feature.title}</h3>
-              <p className="text-sm text-muted-foreground">{feature.description}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
       {/* CTA Section */}
-      <div className="bg-muted/50 border-t border-border">
+      <div className="bg-[hsl(225_50%_8%)] border-t border-white/10">
         <div className="container max-w-4xl mx-auto px-4 py-16 text-center">
-          <h2 className="text-2xl lg:text-3xl font-bold text-foreground">
+          <h2 className="text-2xl lg:text-3xl font-bold text-white">
             Ready to Start Saving?
           </h2>
-          <p className="text-muted-foreground mt-3 mb-8">
+          <p className="text-white/60 mt-3 mb-8">
             Join thousands of users who have transformed their financial habits
           </p>
-          <Link to="/dashboard">
-            <Button size="lg" className="px-8">
+          <Link to="/auth">
+            <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground px-8">
               Start Your Free Account
               <ArrowRight size={18} className="ml-2" />
             </Button>
@@ -183,14 +185,14 @@ const Index = () => {
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-border py-8">
+      <footer className="bg-[hsl(225_50%_6%)] border-t border-white/10 py-8">
         <div className="container max-w-6xl mx-auto px-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <Wallet size={20} className="text-accent" />
-              <span className="font-semibold text-foreground">Coin Whisperer</span>
+              <span className="font-semibold text-white">Coin Whisperer</span>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-white/50">
               © 2025 Coin Whisperer. All rights reserved.
             </p>
           </div>
