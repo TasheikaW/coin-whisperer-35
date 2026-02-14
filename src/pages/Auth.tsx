@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,11 +23,19 @@ const passwordSchema = z.string()
 export default function Auth() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+
+  // Redirect to dashboard if already authenticated (e.g., after Google OAuth callback)
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [authLoading, isAuthenticated, navigate]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
