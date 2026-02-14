@@ -47,16 +47,20 @@ function getDaysElapsed(date: Date): number {
   return date.getDate();
 }
 
-export function useBudgets() {
+export function useBudgets(dateFilter?: { start: Date | null; end: Date | null }) {
   const [budgets, setBudgets] = useState<BudgetWithSpending[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
+  // Use date filter or default to current month
   const now = new Date();
-  const daysInMonth = getDaysInMonth(now);
-  const daysElapsed = getDaysElapsed(now);
-  const daysRemaining = daysInMonth - daysElapsed;
-  const percentMonthElapsed = (daysElapsed / daysInMonth) * 100;
+  const filterStart = dateFilter?.start ?? new Date(now.getFullYear(), now.getMonth(), 1);
+  const filterEnd = dateFilter?.end ?? new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  
+  const daysInRange = Math.max(1, Math.round((filterEnd.getTime() - filterStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  const daysElapsed = Math.max(0, Math.min(daysInRange, Math.round((now.getTime() - filterStart.getTime()) / (1000 * 60 * 60 * 24)) + 1));
+  const daysRemaining = Math.max(0, daysInRange - daysElapsed);
+  const percentMonthElapsed = (daysElapsed / daysInRange) * 100;
 
   const fetchBudgets = useCallback(async () => {
     setIsLoading(true);
@@ -67,12 +71,9 @@ export function useBudgets() {
       return;
     }
 
-    // Get current month date range
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    
-    const startDate = startOfMonth.toISOString().split('T')[0];
-    const endDate = endOfMonth.toISOString().split('T')[0];
+    // Use filter dates
+    const startDate = filterStart.toISOString().split('T')[0];
+    const endDate = filterEnd.toISOString().split('T')[0];
 
     // Fetch budgets with categories
     const { data: budgetsData, error: budgetsError } = await supabase
@@ -130,12 +131,12 @@ export function useBudgets() {
       const isOverBudget = spent > budgetAmount;
       
       // Expected spend based on time elapsed
-      const expectedSpend = (budgetAmount * daysElapsed) / daysInMonth;
-      const expectedPercent = (daysElapsed / daysInMonth) * 100;
+      const expectedSpend = (budgetAmount * daysElapsed) / daysInRange;
+      const expectedPercent = (daysElapsed / daysInRange) * 100;
       
       // Projected spend at month end based on current rate
       const dailySpendRate = daysElapsed > 0 ? spent / daysElapsed : 0;
-      const projectedSpend = dailySpendRate * daysInMonth;
+      const projectedSpend = dailySpendRate * daysInRange;
       const projectedOverage = Math.max(0, projectedSpend - budgetAmount);
       
       // Determine status
@@ -162,7 +163,7 @@ export function useBudgets() {
 
     setBudgets(budgetsWithSpending);
     setIsLoading(false);
-  }, [toast, daysElapsed, daysInMonth]);
+  }, [toast, daysElapsed, daysInRange, filterStart.getTime(), filterEnd.getTime()]);
 
   useEffect(() => {
     fetchBudgets();
@@ -185,10 +186,10 @@ export function useBudgets() {
       categoriesOverBudget,
       daysRemaining,
       daysElapsed,
-      daysInMonth,
+      daysInMonth: daysInRange,
       percentMonthElapsed,
     };
-  }, [budgets, daysRemaining, daysElapsed, daysInMonth, percentMonthElapsed]);
+  }, [budgets, daysRemaining, daysElapsed, daysInRange, percentMonthElapsed]);
 
   const insights: BudgetInsight[] = useMemo(() => {
     const result: BudgetInsight[] = [];
