@@ -1,17 +1,21 @@
 /**
  * Extracts the core vendor name from a merchant string.
- * Strips transaction codes, numbers, and location suffixes.
+ * Strips transaction codes, numbers, and location suffixes
+ * while preserving multi-word merchant names.
  * 
  * Examples:
+ * - "AMZN Mktp CA*PP4JO4NX3" → "AMZN Mktp"
  * - "HOPP/O/2511182241 Toronto" → "HOPP"
- * - "AMAZON.CA*AB1CD2EF3" → "AMAZON.CA"
- * - "UBER* TRIP 12345" → "UBER"
- * - "COSTCO WHOLESALE #1234" → "COSTCO"
+ * - "UBER CANADA/UBERTRIP TORONTO" → "UBER CANADA"
+ * - "LYFT   *RIDE TUE 3PM VANCOUVER" → "LYFT"
+ * - "SP FASHIONNOVA.COM FASHIONNOVA.C" → "SP FASHIONNOVA.COM"
+ * - "COSTCO WHOLESALE #1234" → "COSTCO WHOLESALE"
+ * - "FREEDOM MOBILE 877-946-3184" → "FREEDOM MOBILE"
  */
 export function extractVendorName(merchantString: string): string {
   if (!merchantString) return '';
   
-  let vendor = merchantString.trim().toUpperCase();
+  let vendor = merchantString.trim();
   
   // Strip currency symbols (J$, US$, A$, $, etc.)
   vendor = vendor.replace(/[A-Z]{0,3}\$/g, '').trim();
@@ -20,15 +24,16 @@ export function extractVendorName(merchantString: string): string {
   // Handles: HOPP/O/123, AMAZON*ABC, STORE#123, VENDOR@LOC
   vendor = vendor.split(/[\/\*#@]/)[0].trim();
   
-  // Remove trailing numbers and codes
-  vendor = vendor.replace(/[\d]+$/, '').trim();
+  // Remove trailing standalone numbers/codes (e.g., "877-946-3184", "1234")
+  vendor = vendor.replace(/\s+[\d][\d\-]{3,}$/, '').trim();
   
-  // Take first word to remove location suffixes
-  // "COSTCO WHOLESALE" → "COSTCO"
-  const words = vendor.split(/\s+/);
-  if (words.length > 0) {
-    vendor = words[0];
+  // Remove trailing words that are 2-letter state/province codes (CA, ON, etc.)
+  const words = vendor.split(/\s+/).filter(w => w.length > 0);
+  while (words.length > 1 && /^[A-Za-z]{2}$/.test(words[words.length - 1])) {
+    words.pop();
   }
+  
+  vendor = words.join(' ');
   
   // Clean up any trailing punctuation
   vendor = vendor.replace(/[.\-_]+$/, '');
