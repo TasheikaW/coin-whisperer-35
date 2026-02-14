@@ -66,7 +66,7 @@ const Index = () => {
               </>
             ) : (
               <Link to="/auth">
-                <Button variant="outline" size="sm" className="border-white/20 text-white hover:bg-white/10">
+                <Button variant="outline" size="sm" className="border-white/30 bg-white/10 text-white hover:bg-white/20">
                   Sign In
                 </Button>
               </Link>
