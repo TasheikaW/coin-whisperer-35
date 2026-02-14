@@ -1,10 +1,10 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { SpendingChart } from "@/components/dashboard/SpendingChart";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { InsightCard } from "@/components/dashboard/InsightCard";
 import { BudgetProgress } from "@/components/dashboard/BudgetProgress";
+import { AppLayout } from "@/components/layout/AppLayout";
 import {
   Wallet,
   TrendingDown,
@@ -15,18 +15,10 @@ import {
   Plus,
   Target,
   Download,
-  LayoutDashboard,
-  Upload,
-  Receipt,
-  PiggyBank,
-  BarChart3,
-  Settings,
-  CreditCard,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 
 const demoSpendingByCategory = [
   { name: "Shopping", value: 450, color: "hsl(262, 83%, 58%)" },
@@ -59,16 +51,6 @@ const demoBudgets = [
   { category: "Entertainment", spent: 175, budget: 200 },
 ];
 
-const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", sectionId: "metrics" },
-  { icon: Upload, label: "Charts", sectionId: "charts" },
-  { icon: Receipt, label: "Merchants", sectionId: "merchants" },
-  { icon: PiggyBank, label: "Budgets", sectionId: "budgets" },
-  { icon: BarChart3, label: "Insights", sectionId: "insights" },
-  { icon: CreditCard, label: "Actions", sectionId: "actions" },
-  { icon: Settings, label: "Get Started", sectionId: "cta" },
-];
-
 const merchantColors = [
   "bg-destructive/10 text-destructive",
   "bg-warning/10 text-warning",
@@ -76,16 +58,10 @@ const merchantColors = [
 ];
 
 export default function Demo() {
-  const [activeSection, setActiveSection] = useState("metrics");
   const totalIncome = 5400;
   const totalSpending = 2060;
   const netCashFlow = totalIncome - totalSpending;
   const savingsRate = Math.round((netCashFlow / totalIncome) * 100);
-
-  const scrollToSection = (sectionId: string) => {
-    setActiveSection(sectionId);
-    document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-US", {
@@ -95,7 +71,7 @@ export default function Demo() {
     }).format(amount);
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       {/* Demo Banner */}
       <div className="sticky top-0 z-50 bg-accent text-accent-foreground px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -110,196 +86,164 @@ export default function Demo() {
         </Link>
       </div>
 
-      <div className="flex">
-        {/* Sidebar */}
-        <aside className="hidden lg:flex h-[calc(100vh-40px)] sticky top-10 w-64 flex-col bg-sidebar border-r border-sidebar-border">
-          <div className="flex items-center h-16 px-4 border-b border-sidebar-border">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent to-info flex items-center justify-center shadow-glow">
-                <Wallet size={20} className="text-white" />
-              </div>
-              <span className="text-lg font-semibold text-sidebar-foreground">Coin Whisperer</span>
-            </div>
-          </div>
-          <nav className="flex-1 py-4 px-3 space-y-1">
-            {navItems.map((item) => (
-              <button
-                key={item.label}
-                onClick={() => scrollToSection(item.sectionId)}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 w-full text-left",
-                  activeSection === item.sectionId
-                    ? "bg-sidebar-accent text-sidebar-primary font-medium"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50"
-                )}
-              >
-                <item.icon size={20} />
-                <span>{item.label}</span>
-              </button>
-            ))}
-          </nav>
-        </aside>
-
-        {/* Main content */}
-        <main className="flex-1 p-6 lg:p-8 max-w-7xl">
-          {/* Header */}
-          <div className="mb-8">
+      <AppLayout>
+        {/* Header */}
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div>
             <h1 className="text-3xl lg:text-4xl font-bold text-foreground">Dashboard</h1>
             <p className="text-muted-foreground mt-1">Track your spending and financial health</p>
           </div>
+        </div>
 
-          {/* Metrics Grid */}
-          <div id="metrics" className="scroll-mt-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-            <StatCard
-              title="Total Income"
-              value={formatCurrency(totalIncome)}
-              icon={<Wallet size={20} />}
-              iconVariant="green"
-            />
-            <StatCard
-              title="Total Expenses"
-              value={formatCurrency(totalSpending)}
-              icon={<TrendingDown size={20} />}
-              iconVariant="red"
-            />
-            <StatCard
-              title="Net Cash Flow"
-              value={`+${formatCurrency(netCashFlow)}`}
-              icon={<ArrowLeftRight size={20} />}
-              iconVariant="blue"
-              valueColor="positive"
-            />
-            <StatCard
-              title="Savings Rate"
-              value={`${savingsRate}%`}
-              icon={<TrendingUp size={20} />}
-              iconVariant="purple"
-            />
-          </div>
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+          <StatCard
+            title="Total Income"
+            value={formatCurrency(totalIncome)}
+            icon={<Wallet size={20} />}
+            iconVariant="green"
+          />
+          <StatCard
+            title="Total Expenses"
+            value={formatCurrency(totalSpending)}
+            icon={<TrendingDown size={20} />}
+            iconVariant="red"
+          />
+          <StatCard
+            title="Net Cash Flow"
+            value={`+${formatCurrency(netCashFlow)}`}
+            icon={<ArrowLeftRight size={20} />}
+            iconVariant="blue"
+            valueColor="positive"
+          />
+          <StatCard
+            title="Savings Rate"
+            value={`${savingsRate}%`}
+            icon={<TrendingUp size={20} />}
+            iconVariant="purple"
+          />
+        </div>
 
-          {/* Charts Grid */}
-          <div id="charts" className="scroll-mt-16 grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
-            <Card className="lg:col-span-2 border-border/50">
-              <CardHeader>
-                <CardTitle className="text-xl font-semibold">Spending by Category</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <SpendingChart data={demoSpendingByCategory} />
-              </CardContent>
-            </Card>
+        {/* Charts Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
+          <Card className="lg:col-span-2 border-border/50">
+            <CardHeader>
+              <CardTitle className="text-xl font-semibold">Spending by Category</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SpendingChart data={demoSpendingByCategory} />
+            </CardContent>
+          </Card>
 
-            <Card className="lg:col-span-3 border-border/50">
-              <CardHeader>
-                <CardTitle className="text-xl font-semibold">Income vs Spending</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <TrendChart data={demoMonthlyTrends} />
-              </CardContent>
-            </Card>
-          </div>
+          <Card className="lg:col-span-3 border-border/50">
+            <CardHeader>
+              <CardTitle className="text-xl font-semibold">Income vs Spending</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TrendChart data={demoMonthlyTrends} />
+            </CardContent>
+          </Card>
+        </div>
 
-          {/* Top 3 Merchants */}
-          <div id="merchants" className="scroll-mt-16 mb-8">
-            <h2 className="text-2xl font-semibold text-foreground mb-4">Top Merchants</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {demoMerchants.map((merchant, index) => (
-                <Card key={merchant.name} className="border-border/50">
-                  <CardContent className="pt-6">
-                    <div className="flex items-start gap-3">
-                      <div className={`p-2 rounded-lg ${merchantColors[index]}`}>
-                        <Store size={18} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-muted-foreground">#{index + 1}</p>
-                        <p className="font-semibold text-foreground truncate">{merchant.name}</p>
-                        <p className="text-lg font-bold text-foreground mt-1">
-                          {formatCurrency(merchant.total)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {merchant.count} transaction{merchant.count !== 1 ? "s" : ""}
-                        </p>
-                      </div>
+        {/* Top 3 Merchants */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-semibold text-foreground mb-4">Top Merchants</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {demoMerchants.map((merchant, index) => (
+              <Card key={merchant.name} className="border-border/50">
+                <CardContent className="pt-6">
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${merchantColors[index]}`}>
+                      <Store size={18} />
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-muted-foreground">#{index + 1}</p>
+                      <p className="font-semibold text-foreground truncate">{merchant.name}</p>
+                      <p className="text-lg font-bold text-foreground mt-1">
+                        {formatCurrency(merchant.total)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {merchant.count} transaction{merchant.count !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* Budget Progress */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-semibold text-foreground mb-4">Budget Progress</h2>
+          <Card className="border-border/50">
+            <CardContent className="pt-6 space-y-5">
+              {demoBudgets.map((b) => (
+                <BudgetProgress
+                  key={b.category}
+                  category={b.category}
+                  spent={b.spent}
+                  budget={b.budget}
+                />
               ))}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
+        </div>
 
-          {/* Budget Progress */}
-          <div id="budgets" className="scroll-mt-16 mb-8">
-            <h2 className="text-2xl font-semibold text-foreground mb-4">Budget Progress</h2>
-            <Card className="border-border/50">
-              <CardContent className="pt-6 space-y-5">
-                {demoBudgets.map((b) => (
-                  <BudgetProgress
-                    key={b.category}
-                    category={b.category}
-                    spent={b.spent}
-                    budget={b.budget}
-                  />
-                ))}
-              </CardContent>
-            </Card>
+        {/* Smart Insights */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-semibold text-foreground mb-4">Smart Insights</h2>
+          <div className="space-y-3">
+            <InsightCard
+              icon={<span>💡</span>}
+              title="Great savings rate!"
+              description={`You're saving ${savingsRate}% of your income, above the recommended 20%.`}
+              type="success"
+            />
+            <InsightCard
+              icon={<span>⚠️</span>}
+              title="Dining over budget"
+              description="Your dining spending ($340) has exceeded the $300 budget. Consider reducing dining out."
+              type="warning"
+            />
+            <InsightCard
+              icon={<span>📋</span>}
+              title="Top spending: Groceries"
+              description={`Your highest spending category is Groceries at ${formatCurrency(620)}.`}
+              type="info"
+            />
           </div>
+        </div>
 
-          {/* Smart Insights */}
-          <div id="insights" className="scroll-mt-16 mb-8">
-            <h2 className="text-2xl font-semibold text-foreground mb-4">Smart Insights</h2>
-            <div className="space-y-3">
-              <InsightCard
-                icon={<span>💡</span>}
-                title="Great savings rate!"
-                description={`You're saving ${savingsRate}% of your income, above the recommended 20%.`}
-                type="success"
-              />
-              <InsightCard
-                icon={<span>⚠️</span>}
-                title="Dining over budget"
-                description="Your dining spending ($340) has exceeded the $300 budget. Consider reducing dining out."
-                type="warning"
-              />
-              <InsightCard
-                icon={<span>📋</span>}
-                title="Top spending: Groceries"
-                description={`Your highest spending category is Groceries at ${formatCurrency(620)}.`}
-                type="info"
-              />
-            </div>
-          </div>
+        {/* Quick Actions */}
+        <div className="flex flex-wrap gap-3 mb-8">
+          <Button className="gap-2" disabled>
+            <Plus size={16} />
+            Add Transaction
+          </Button>
+          <Button variant="outline" className="gap-2 border-border/50" disabled>
+            <Target size={16} />
+            Set Budget
+          </Button>
+          <Button variant="outline" className="gap-2 border-border/50" disabled>
+            <Download size={16} />
+            Export Report
+          </Button>
+        </div>
 
-          {/* Quick Actions */}
-          <div id="actions" className="scroll-mt-16 flex flex-wrap gap-3 mb-8">
-            <Button className="gap-2" disabled>
-              <Plus size={16} />
-              Add Transaction
-            </Button>
-            <Button variant="outline" className="gap-2 border-border/50" disabled>
-              <Target size={16} />
-              Set Budget
-            </Button>
-            <Button variant="outline" className="gap-2 border-border/50" disabled>
-              <Download size={16} />
-              Export Report
-            </Button>
-          </div>
-
-          {/* CTA */}
-          <div id="cta" className="scroll-mt-16">
-            <Card className="bg-accent/5 border-accent/20">
-              <CardContent className="py-8 text-center">
-                <h3 className="text-xl font-bold text-foreground mb-2">Like what you see?</h3>
-                <p className="text-muted-foreground mb-4">Sign up for free to start tracking your own finances</p>
-                <Link to="/auth">
-                  <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                    Get Started Free
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </div>
-        </main>
-      </div>
-    </div>
+        {/* CTA */}
+        <Card className="bg-accent/5 border-accent/20">
+          <CardContent className="py-8 text-center">
+            <h3 className="text-xl font-bold text-foreground mb-2">Like what you see?</h3>
+            <p className="text-muted-foreground mb-4">Sign up for free to start tracking your own finances</p>
+            <Link to="/auth">
+              <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                Get Started Free
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </AppLayout>
+    </>
   );
 }
