@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { extractVendorName } from '@/lib/vendorExtractor';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Transaction = Tables<'transactions'> & {
@@ -102,7 +103,7 @@ export function useDashboardData(dateFilter?: { start: Date | null; end: Date | 
   const topMerchants = transactions
     .filter(t => t.direction === 'debit' && !t.is_transfer)
     .reduce((acc, t) => {
-      const merchant = t.merchant_normalized || t.description_raw || 'Unknown';
+      const merchant = extractVendorName(t.merchant_normalized || t.description_raw || 'Unknown');
       const existing = acc.find(m => m.name === merchant);
       if (existing) {
         existing.total += t.amount;
