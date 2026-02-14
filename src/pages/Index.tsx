@@ -93,7 +93,7 @@ const Index = () => {
             {/* Headline */}
             <h1 className="text-4xl lg:text-6xl font-bold text-white max-w-3xl leading-tight">
               Take Control of Your{" "}
-              <span className="text-gradient bg-gradient-to-r from-accent to-emerald-400 bg-clip-text text-transparent">
+              <span className="text-gradient">
                 Financial Future
               </span>
             </h1>
