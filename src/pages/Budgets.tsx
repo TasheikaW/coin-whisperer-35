@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,9 +8,17 @@ import { BudgetSummaryCards } from "@/components/budgets/BudgetSummaryCards";
 import { BudgetProgressCard } from "@/components/budgets/BudgetProgressCard";
 import { BudgetInsightsPanel } from "@/components/budgets/BudgetInsightsPanel";
 import { AddBudgetDialog } from "@/components/budgets/AddBudgetDialog";
-import { Calendar } from "lucide-react";
+import { DateRangeFilter, type DatePreset } from "@/components/shared/DateRangeFilter";
+import { startOfMonth, endOfMonth } from "date-fns";
 
 export default function Budgets() {
+  const now = new Date();
+  const [dateRange, setDateRange] = useState<{ start: Date | null; end: Date | null }>({
+    start: startOfMonth(now),
+    end: endOfMonth(now),
+  });
+  const [preset, setPreset] = useState<DatePreset>("this-month");
+
   const {
     budgets,
     summary,
@@ -18,7 +27,7 @@ export default function Budgets() {
     createBudget,
     updateBudget,
     deleteBudget,
-  } = useBudgets();
+  } = useBudgets(dateRange);
 
   const existingCategoryIds = budgets.map(b => b.category_id);
 
@@ -35,12 +44,14 @@ export default function Budgets() {
         }
       />
 
-      {/* Time indicator */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
-        <Calendar size={16} />
-        <span>
-          {summary.daysElapsed} of {summary.daysInMonth} days elapsed ({summary.percentMonthElapsed.toFixed(0)}% of month)
-        </span>
+      {/* Date Filter */}
+      <div className="mb-6">
+        <DateRangeFilter
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
+          preset={preset}
+          onPresetChange={setPreset}
+        />
       </div>
 
       {/* Summary Cards */}
