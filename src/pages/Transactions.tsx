@@ -1,5 +1,5 @@
-import { useState, useMemo, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,13 +70,26 @@ const categoryColors: Record<string, string> = {
 export default function Transactions() {
   const { transactions, isLoading, uploadFilter, updateTransaction, fetchTransactions } = useTransactions();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   
-  const [searchQuery, setSearchQuery] = useState("");
+  const merchantParam = searchParams.get('merchant') || '';
+  const [searchQuery, setSearchQuery] = useState(merchantParam);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [showTransfers, setShowTransfers] = useState(true);
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [dateRange, setDateRange] = useState<{ start: Date | null; end: Date | null }>({ start: null, end: null });
+
+  // Sync search query from URL param
+  useEffect(() => {
+    const m = searchParams.get('merchant');
+    if (m) {
+      setSearchQuery(m);
+      // Clean up URL after applying
+      searchParams.delete('merchant');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, []);
   
   // Sorting state
   type SortField = 'date' | 'description' | 'category' | 'source' | 'amount';
