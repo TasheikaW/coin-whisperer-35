@@ -115,7 +115,7 @@ export default function Auth() {
       } else {
         toast({
           title: "Account created!",
-          description: "Welcome to Fundza. Let's get started!",
+          description: "Welcome to Coin Whisperer. Let's get started!",
         });
         navigate("/dashboard");
       }
@@ -160,11 +160,11 @@ export default function Auth() {
         <Card className="shadow-lg">
           <CardHeader className="text-center pb-2">
             <div className="flex justify-center mb-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent to-success flex items-center justify-center shadow-glow">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent to-info flex items-center justify-center shadow-glow">
                 <Wallet size={24} className="text-white" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold">Fundza</CardTitle>
+            <CardTitle className="text-2xl font-bold">Coin Whisperer</CardTitle>
             <CardDescription>
               Take control of your financial future
             </CardDescription>

@@ -83,12 +83,12 @@ export function AppSidebar() {
         collapsed && "justify-center"
       )}>
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent to-success flex items-center justify-center shadow-glow">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent to-info flex items-center justify-center shadow-glow">
             <Wallet size={20} className="text-white" />
           </div>
           {!collapsed && (
             <span className="text-lg font-semibold text-sidebar-foreground">
-              Fundza
+              Coin Whisperer
             </span>
           )}
         </div>
