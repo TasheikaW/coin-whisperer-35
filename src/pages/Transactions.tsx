@@ -450,7 +450,7 @@ export default function Transactions() {
                                 <Pencil size={14} className="mr-2" />
                                 Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDelete(transaction)} className="text-destructive focus:text-destructive">
+                              <DropdownMenuItem onClick={() => handleDeleteClick(transaction)} className="text-destructive focus:text-destructive">
                                 <Trash2 size={14} className="mr-2" />
                                 Delete
                               </DropdownMenuItem>
