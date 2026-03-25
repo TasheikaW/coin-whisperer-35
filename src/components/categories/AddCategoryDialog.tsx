@@ -68,7 +68,7 @@ export function AddCategoryDialog({ open, onOpenChange, onCategoryAdded }: AddCa
 
     toast({ title: "Category created", description: `"${name.trim()}" has been added.` });
     setName("");
-    setCategoryType("expense");
+    setCategoryType("spending");
     setColor(PRESET_COLORS[0]);
     onOpenChange(false);
     onCategoryAdded?.();
