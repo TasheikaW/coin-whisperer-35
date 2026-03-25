@@ -516,5 +516,6 @@ export default function Transactions() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </AppLayout>
   );
 }
