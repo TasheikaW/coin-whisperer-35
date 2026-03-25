@@ -244,7 +244,7 @@ export default function Transactions() {
       
       return sortDirection === 'asc' ? comparison : -comparison;
     });
-  }, [transactions, showTransfers, categoryFilter, searchQuery, sortField, sortDirection]);
+  }, [transactions, showTransfers, categoryFilter, searchQuery, sortField, sortDirection, dateRange]);
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-US", {
