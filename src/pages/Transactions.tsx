@@ -115,6 +115,23 @@ export default function Transactions() {
     }
   };
   
+  // State for edit/delete
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+
+  const handleEdit = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setEditDialogOpen(true);
+  };
+
+  const handleDelete = async (transaction: Transaction) => {
+    const confirmed = window.confirm(`Delete transaction "${transaction.description_raw}"?`);
+    if (confirmed) {
+      await deleteTransaction(transaction.id);
+      toast({ title: "Transaction deleted" });
+    }
+  };
+
   // State for save rule dialog
   const [saveRuleDialogOpen, setSaveRuleDialogOpen] = useState(false);
   const [pendingRuleData, setPendingRuleData] = useState<{
