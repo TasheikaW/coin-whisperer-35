@@ -77,7 +77,7 @@ const categoryColors: Record<string, string> = {
 };
 
 export default function Transactions() {
-  const { transactions, isLoading, uploadFilter, updateTransaction, fetchTransactions } = useTransactions();
+  const { transactions, isLoading, uploadFilter, updateTransaction, deleteTransaction, fetchTransactions } = useTransactions();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
