@@ -76,7 +76,7 @@ export function AddCategoryDialog({ open, onOpenChange, onCategoryAdded }: AddCa
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="sm:max-w-[400px] max-h-[90vh] overflow-y-auto left-0 right-0 top-0 bottom-0 m-auto translate-x-0 translate-y-0 data-[state=open]:slide-in-from-left-0 data-[state=open]:slide-in-from-top-0 data-[state=closed]:slide-out-to-left-0 data-[state=closed]:slide-out-to-top-0">
         <DialogHeader>
           <DialogTitle>New Category</DialogTitle>
         </DialogHeader>
