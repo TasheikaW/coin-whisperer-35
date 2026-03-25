@@ -3,6 +3,13 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { EditTransactionDialog } from "@/components/transactions/EditTransactionDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,6 +27,8 @@ import {
   ArrowUp,
   ArrowDown,
   MoreHorizontal,
+  Pencil,
+  Trash2,
   ShoppingCart,
   Utensils,
   Car,
@@ -68,7 +77,7 @@ const categoryColors: Record<string, string> = {
 };
 
 export default function Transactions() {
-  const { transactions, isLoading, uploadFilter, updateTransaction, fetchTransactions } = useTransactions();
+  const { transactions, isLoading, uploadFilter, updateTransaction, deleteTransaction, fetchTransactions } = useTransactions();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
@@ -106,6 +115,23 @@ export default function Transactions() {
     }
   };
   
+  // State for edit/delete
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+
+  const handleEdit = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setEditDialogOpen(true);
+  };
+
+  const handleDelete = async (transaction: Transaction) => {
+    const confirmed = window.confirm(`Delete transaction "${transaction.description_raw}"?`);
+    if (confirmed) {
+      await deleteTransaction(transaction.id);
+      toast({ title: "Transaction deleted" });
+    }
+  };
+
   // State for save rule dialog
   const [saveRuleDialogOpen, setSaveRuleDialogOpen] = useState(false);
   const [pendingRuleData, setPendingRuleData] = useState<{
@@ -394,10 +420,24 @@ export default function Transactions() {
                         )}>
                           {isInflow ? "+" : "-"}{formatCurrency(transaction.amount)}
                         </td>
-                        <td>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal size={16} />
-                          </Button>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal size={16} />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEdit(transaction)}>
+                                <Pencil size={14} className="mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDelete(transaction)} className="text-destructive focus:text-destructive">
+                                <Trash2 size={14} className="mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </td>
                       </tr>
                     );
@@ -426,6 +466,20 @@ export default function Transactions() {
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
         onTransactionAdded={() => fetchTransactions()}
+      />
+
+      <EditTransactionDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        transaction={editingTransaction}
+        onSave={async (id, updates) => {
+          const success = await updateTransaction(id, updates as any);
+          if (success) {
+            toast({ title: "Transaction updated" });
+            fetchTransactions(true);
+          }
+          return success;
+        }}
       />
     </AppLayout>
   );
