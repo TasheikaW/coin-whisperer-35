@@ -34,7 +34,7 @@ interface AddCategoryDialogProps {
 
 export function AddCategoryDialog({ open, onOpenChange, onCategoryAdded }: AddCategoryDialogProps) {
   const [name, setName] = useState("");
-  const [categoryType, setCategoryType] = useState("expense");
+  const [categoryType, setCategoryType] = useState("spending");
   const [color, setColor] = useState(PRESET_COLORS[0]);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
@@ -68,7 +68,7 @@ export function AddCategoryDialog({ open, onOpenChange, onCategoryAdded }: AddCa
 
     toast({ title: "Category created", description: `"${name.trim()}" has been added.` });
     setName("");
-    setCategoryType("expense");
+    setCategoryType("spending");
     setColor(PRESET_COLORS[0]);
     onOpenChange(false);
     onCategoryAdded?.();
@@ -76,7 +76,7 @@ export function AddCategoryDialog({ open, onOpenChange, onCategoryAdded }: AddCa
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="sm:max-w-[400px] max-h-[90vh] overflow-y-auto left-0 right-0 top-0 bottom-0 m-auto translate-x-0 translate-y-0 data-[state=open]:slide-in-from-left-0 data-[state=open]:slide-in-from-top-0 data-[state=closed]:slide-out-to-left-0 data-[state=closed]:slide-out-to-top-0">
         <DialogHeader>
           <DialogTitle>New Category</DialogTitle>
         </DialogHeader>
@@ -96,8 +96,9 @@ export function AddCategoryDialog({ open, onOpenChange, onCategoryAdded }: AddCa
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="expense">Expense</SelectItem>
+                <SelectItem value="spending">Expense</SelectItem>
                 <SelectItem value="income">Income</SelectItem>
+                <SelectItem value="transfer">Transfer</SelectItem>
               </SelectContent>
             </Select>
           </div>
