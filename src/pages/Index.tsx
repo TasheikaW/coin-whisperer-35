@@ -185,7 +185,7 @@ const Index = () => {
       </div>
 
       {/* Footer */}
-      <footer className="bg-[hsl(225_50%_6%)] border-t border-white/10 py-8">
+      <footer className="bg-[hsl(160_50%_4%)] border-t border-white/10 py-8">
         <div className="container max-w-6xl mx-auto px-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
