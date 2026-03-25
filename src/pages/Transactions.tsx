@@ -467,6 +467,20 @@ export default function Transactions() {
         onOpenChange={setAddDialogOpen}
         onTransactionAdded={() => fetchTransactions()}
       />
+
+      <EditTransactionDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        transaction={editingTransaction}
+        onSave={async (id, updates) => {
+          const success = await updateTransaction(id, updates as any);
+          if (success) {
+            toast({ title: "Transaction updated" });
+            fetchTransactions(true);
+          }
+          return success;
+        }}
+      />
     </AppLayout>
   );
 }
