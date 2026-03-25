@@ -34,7 +34,7 @@ interface AddCategoryDialogProps {
 
 export function AddCategoryDialog({ open, onOpenChange, onCategoryAdded }: AddCategoryDialogProps) {
   const [name, setName] = useState("");
-  const [categoryType, setCategoryType] = useState("expense");
+  const [categoryType, setCategoryType] = useState("spending");
   const [color, setColor] = useState(PRESET_COLORS[0]);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
