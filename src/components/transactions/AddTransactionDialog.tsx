@@ -102,7 +102,7 @@ export function AddTransactionDialog({ open, onOpenChange, onTransactionAdded }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto left-0 right-0 top-0 bottom-0 m-auto translate-x-0 translate-y-0 data-[state=open]:slide-in-from-left-0 data-[state=open]:slide-in-from-top-0 data-[state=closed]:slide-out-to-left-0 data-[state=closed]:slide-out-to-top-0">
         <DialogHeader>
           <DialogTitle>Add Transaction</DialogTitle>
         </DialogHeader>
@@ -152,7 +152,7 @@ export function AddTransactionDialog({ open, onOpenChange, onTransactionAdded }:
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="sticky bottom-0 bg-background pt-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Adding...</> : 'Add Transaction'}
