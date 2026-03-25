@@ -167,7 +167,7 @@ const Index = () => {
       </div>
 
       {/* CTA Section */}
-      <div className="bg-[hsl(225_50%_8%)] border-t border-white/10">
+      <div className="bg-[hsl(160_50%_6%)] border-t border-white/10">
         <div className="container max-w-4xl mx-auto px-4 py-16 text-center">
           <h2 className="text-2xl lg:text-3xl font-bold text-white">
             Ready to Start Saving?
@@ -185,7 +185,7 @@ const Index = () => {
       </div>
 
       {/* Footer */}
-      <footer className="bg-[hsl(225_50%_6%)] border-t border-white/10 py-8">
+      <footer className="bg-[hsl(160_50%_4%)] border-t border-white/10 py-8">
         <div className="container max-w-6xl mx-auto px-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">

@@ -4,135 +4,135 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Coin Whisperer Design System - Deep Navy + Electric Blue */
+/* Coin Whisperer Design System - Emerald Green */
 
 @layer base {
   :root {
-    /* Core brand colors - Deep navy with electric blue accent */
-    --background: 220 20% 97%;
-    --foreground: 225 50% 10%;
+    /* Core brand colors - Emerald green palette */
+    --background: 150 20% 97%;
+    --foreground: 160 50% 8%;
     
     --card: 0 0% 100%;
-    --card-foreground: 225 50% 10%;
+    --card-foreground: 160 50% 8%;
     
     --popover: 0 0% 100%;
-    --popover-foreground: 225 50% 10%;
+    --popover-foreground: 160 50% 8%;
     
-    /* Primary - Deep navy */
-    --primary: 225 50% 12%;
-    --primary-foreground: 220 30% 98%;
+    /* Primary - Deep emerald */
+    --primary: 160 50% 12%;
+    --primary-foreground: 150 30% 98%;
     
-    /* Secondary - Soft navy gray */
-    --secondary: 220 20% 95%;
-    --secondary-foreground: 225 50% 12%;
+    /* Secondary - Soft green gray */
+    --secondary: 150 15% 95%;
+    --secondary-foreground: 160 50% 12%;
     
-    /* Muted - Subtle navy tones */
-    --muted: 220 20% 95%;
-    --muted-foreground: 220 16% 46%;
+    /* Muted - Subtle green tones */
+    --muted: 150 15% 95%;
+    --muted-foreground: 155 12% 46%;
     
-    /* Accent - Electric blue */
-    --accent: 217 91% 60%;
+    /* Accent - Vibrant emerald */
+    --accent: 158 64% 42%;
     --accent-foreground: 0 0% 100%;
     
     /* Destructive - Coral red */
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     
-    /* Success - Emerald green */
-    --success: 158 64% 42%;
+    /* Success - Bright green */
+    --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
     
     /* Warning - Amber */
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
     
-    /* Info - Sky blue */
-    --info: 199 89% 48%;
+    /* Info - Teal */
+    --info: 174 72% 40%;
     --info-foreground: 0 0% 100%;
     
-    --border: 220 25% 90%;
-    --input: 220 25% 90%;
-    --ring: 217 91% 60%;
+    --border: 150 20% 90%;
+    --input: 150 20% 90%;
+    --ring: 158 64% 42%;
     
     --radius: 0.75rem;
     
-    /* Sidebar - Deep navy sidebar */
-    --sidebar-background: 225 50% 12%;
-    --sidebar-foreground: 220 20% 85%;
-    --sidebar-primary: 217 91% 60%;
+    /* Sidebar - Deep emerald sidebar */
+    --sidebar-background: 160 50% 10%;
+    --sidebar-foreground: 150 20% 85%;
+    --sidebar-primary: 158 64% 42%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 225 40% 18%;
-    --sidebar-accent-foreground: 220 20% 95%;
-    --sidebar-border: 225 40% 20%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-accent: 160 40% 16%;
+    --sidebar-accent-foreground: 150 20% 95%;
+    --sidebar-border: 160 40% 18%;
+    --sidebar-ring: 158 64% 42%;
     
     /* Chart colors - Gradient palette */
-    --chart-1: 217 91% 60%;
-    --chart-2: 199 89% 48%;
+    --chart-1: 158 64% 42%;
+    --chart-2: 174 72% 40%;
     --chart-3: 262 83% 58%;
     --chart-4: 38 92% 50%;
     --chart-5: 0 72% 51%;
-    --chart-6: 158 64% 42%;
+    --chart-6: 199 89% 48%;
 
     /* Category colors */
-    --category-groceries: 158 64% 42%;
+    --category-groceries: 142 71% 45%;
     --category-dining: 38 92% 50%;
-    --category-transport: 199 89% 48%;
+    --category-transport: 174 72% 40%;
     --category-shopping: 262 83% 58%;
-    --category-utilities: 217 50% 50%;
+    --category-utilities: 158 50% 50%;
     --category-entertainment: 328 73% 52%;
     --category-health: 0 72% 51%;
-    --category-income: 217 91% 60%;
+    --category-income: 158 64% 42%;
     
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(225 50% 12%) 0%, hsl(225 40% 20%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(199 89% 58%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(220 20% 99%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(160 50% 10%) 0%, hsl(160 40% 18%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(158 64% 42%) 0%, hsl(174 72% 45%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(150 15% 99%) 100%);
     
     /* Shadows */
-    --shadow-sm: 0 1px 2px 0 hsl(225 50% 10% / 0.05);
-    --shadow-md: 0 4px 6px -1px hsl(225 50% 10% / 0.08), 0 2px 4px -2px hsl(225 50% 10% / 0.05);
-    --shadow-lg: 0 10px 15px -3px hsl(225 50% 10% / 0.1), 0 4px 6px -4px hsl(225 50% 10% / 0.05);
-    --shadow-glow: 0 0 20px hsl(217 91% 60% / 0.25);
+    --shadow-sm: 0 1px 2px 0 hsl(160 50% 8% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(160 50% 8% / 0.08), 0 2px 4px -2px hsl(160 50% 8% / 0.05);
+    --shadow-lg: 0 10px 15px -3px hsl(160 50% 8% / 0.1), 0 4px 6px -4px hsl(160 50% 8% / 0.05);
+    --shadow-glow: 0 0 20px hsl(158 64% 42% / 0.25);
   }
 
   .dark {
-    --background: 225 50% 6%;
-    --foreground: 220 20% 95%;
+    --background: 160 50% 4%;
+    --foreground: 150 20% 95%;
     
-    --card: 225 50% 9%;
-    --card-foreground: 220 20% 95%;
+    --card: 160 45% 7%;
+    --card-foreground: 150 20% 95%;
     
-    --popover: 225 50% 9%;
-    --popover-foreground: 220 20% 95%;
+    --popover: 160 45% 7%;
+    --popover-foreground: 150 20% 95%;
     
-    --primary: 220 20% 95%;
-    --primary-foreground: 225 50% 12%;
+    --primary: 150 20% 95%;
+    --primary-foreground: 160 50% 10%;
     
-    --secondary: 225 35% 15%;
-    --secondary-foreground: 220 20% 95%;
+    --secondary: 160 30% 13%;
+    --secondary-foreground: 150 20% 95%;
     
-    --muted: 225 35% 15%;
-    --muted-foreground: 220 16% 60%;
+    --muted: 160 30% 13%;
+    --muted-foreground: 155 12% 60%;
     
-    --accent: 217 91% 60%;
+    --accent: 158 64% 42%;
     --accent-foreground: 0 0% 100%;
     
     --destructive: 0 62% 40%;
     --destructive-foreground: 0 0% 100%;
     
-    --border: 225 35% 18%;
-    --input: 225 35% 18%;
-    --ring: 217 91% 60%;
+    --border: 160 30% 16%;
+    --input: 160 30% 16%;
+    --ring: 158 64% 42%;
     
-    --sidebar-background: 225 50% 6%;
-    --sidebar-foreground: 220 20% 80%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-background: 160 50% 4%;
+    --sidebar-foreground: 150 20% 80%;
+    --sidebar-primary: 158 64% 42%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 225 35% 12%;
-    --sidebar-accent-foreground: 220 20% 95%;
-    --sidebar-border: 225 35% 15%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-accent: 160 35% 10%;
+    --sidebar-accent-foreground: 150 20% 95%;
+    --sidebar-border: 160 30% 13%;
+    --sidebar-ring: 158 64% 42%;
   }
 }
 
@@ -168,7 +168,7 @@
   
   .progress-bar-fill {
     @apply h-full rounded-full transition-all duration-500 ease-out;
-    background: linear-gradient(90deg, hsl(var(--accent)) 0%, hsl(199 89% 58%) 100%);
+    background: linear-gradient(90deg, hsl(var(--accent)) 0%, hsl(174 72% 45%) 100%);
   }
   
   /* Budget warning states */
@@ -241,14 +241,14 @@
   
   /* Animated gradient background */
   .gradient-bg {
-    background: linear-gradient(135deg, hsl(225 50% 12%) 0%, hsl(225 40% 18%) 50%, hsl(217 60% 25%) 100%);
+    background: linear-gradient(135deg, hsl(160 50% 10%) 0%, hsl(160 40% 16%) 50%, hsl(158 45% 22%) 100%);
   }
 }
 
 @layer utilities {
   /* Text gradient */
   .text-gradient {
-    background: linear-gradient(135deg, hsl(var(--accent)) 0%, hsl(199 89% 58%) 100%);
+    background: linear-gradient(135deg, hsl(var(--accent)) 0%, hsl(174 72% 45%) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
