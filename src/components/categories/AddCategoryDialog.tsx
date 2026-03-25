@@ -96,8 +96,9 @@ export function AddCategoryDialog({ open, onOpenChange, onCategoryAdded }: AddCa
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="expense">Expense</SelectItem>
+                <SelectItem value="spending">Expense</SelectItem>
                 <SelectItem value="income">Income</SelectItem>
+                <SelectItem value="transfer">Transfer</SelectItem>
               </SelectContent>
             </Select>
           </div>
