@@ -27,6 +27,8 @@ import {
   ArrowUp,
   ArrowDown,
   MoreHorizontal,
+  Pencil,
+  Trash2,
   ShoppingCart,
   Utensils,
   Car,
