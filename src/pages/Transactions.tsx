@@ -128,17 +128,25 @@ export default function Transactions() {
   // State for edit/delete
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
 
   const handleEdit = (transaction: Transaction) => {
     setEditingTransaction(transaction);
     setEditDialogOpen(true);
   };
 
-  const handleDelete = async (transaction: Transaction) => {
-    const confirmed = window.confirm(`Delete transaction "${transaction.description_raw}"?`);
-    if (confirmed) {
-      await deleteTransaction(transaction.id);
+  const handleDeleteClick = (transaction: Transaction) => {
+    setDeletingTransaction(transaction);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (deletingTransaction) {
+      await deleteTransaction(deletingTransaction.id);
       toast({ title: "Transaction deleted" });
+      setDeleteDialogOpen(false);
+      setDeletingTransaction(null);
     }
   };
 
