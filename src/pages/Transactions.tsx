@@ -9,6 +9,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { EditTransactionDialog } from "@/components/transactions/EditTransactionDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -118,17 +128,25 @@ export default function Transactions() {
   // State for edit/delete
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
 
   const handleEdit = (transaction: Transaction) => {
     setEditingTransaction(transaction);
     setEditDialogOpen(true);
   };
 
-  const handleDelete = async (transaction: Transaction) => {
-    const confirmed = window.confirm(`Delete transaction "${transaction.description_raw}"?`);
-    if (confirmed) {
-      await deleteTransaction(transaction.id);
+  const handleDeleteClick = (transaction: Transaction) => {
+    setDeletingTransaction(transaction);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (deletingTransaction) {
+      await deleteTransaction(deletingTransaction.id);
       toast({ title: "Transaction deleted" });
+      setDeleteDialogOpen(false);
+      setDeletingTransaction(null);
     }
   };
 
@@ -432,7 +450,7 @@ export default function Transactions() {
                                 <Pencil size={14} className="mr-2" />
                                 Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDelete(transaction)} className="text-destructive focus:text-destructive">
+                              <DropdownMenuItem onClick={() => handleDeleteClick(transaction)} className="text-destructive focus:text-destructive">
                                 <Trash2 size={14} className="mr-2" />
                                 Delete
                               </DropdownMenuItem>
@@ -481,6 +499,23 @@ export default function Transactions() {
           return success;
         }}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="left-0 right-0 top-0 bottom-0 m-auto translate-x-0 translate-y-0 data-[state=open]:slide-in-from-left-0 data-[state=open]:slide-in-from-top-0">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deletingTransaction?.description_raw}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
