@@ -1,18 +1,15 @@
 
 
-# Rename App: BudgetFlow → Fundza
+## Fix: Add Missing RLS Policies on `subscriptions` Table
 
-A straightforward find-and-replace across all files where "BudgetFlow" appears, plus updating the HTML title and meta tags.
+The `subscriptions` table currently only has SELECT and INSERT RLS policies. Any authenticated user can UPDATE or DELETE any subscription record, which is a critical security vulnerability.
 
-## Changes
+### What will change
 
-| File | What changes |
-|------|-------------|
-| `index.html` | Update `<title>` and `og:title` from "Lovable App" to "Fundza" |
-| `src/pages/Index.tsx` | Replace "BudgetFlow" (3 occurrences: hero logo, footer name, copyright) |
-| `src/pages/Auth.tsx` | Replace "BudgetFlow" (2 occurrences: welcome toast, card title) |
-| `src/components/layout/AppSidebar.tsx` | Replace "BudgetFlow" in sidebar brand name |
-| `src/index.css` | Update the CSS comment from "BudgetFlow" to "Fundza" |
+A database migration adding two RLS policies:
 
-Total: 7 text replacements + 2 HTML meta updates. No logic changes.
+1. **UPDATE policy** — users can only update their own subscription (`auth.uid() = user_id`)
+2. **DELETE policy** — users can only delete their own subscription (`auth.uid() = user_id`)
+
+No code changes needed — this is a single SQL migration.
 
