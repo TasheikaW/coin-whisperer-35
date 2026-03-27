@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { extractVendorName } from '@/lib/vendorExtractor';
 import type { Tables } from '@/integrations/supabase/types';
@@ -25,9 +25,12 @@ interface BudgetProgress {
   budget: number;
 }
 
+const QUERY_LIMIT = 5000;
+
 export function useDashboardData(dateFilter?: { start: Date | null; end: Date | null }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hitLimit, setHitLimit] = useState(false);
 
   const fetchTransactions = useCallback(async () => {
     setIsLoading(true);
@@ -45,7 +48,7 @@ export function useDashboardData(dateFilter?: { start: Date | null; end: Date | 
         categories (name, color)
       `)
       .order('transaction_date', { ascending: false })
-      .limit(1000);
+      .limit(QUERY_LIMIT);
 
     if (dateFilter?.start) {
       query = query.gte('transaction_date', dateFilter.start.toISOString().split('T')[0]);
@@ -56,7 +59,9 @@ export function useDashboardData(dateFilter?: { start: Date | null; end: Date | 
 
     const { data } = await query;
 
-    setTransactions(data || []);
+    const results = data || [];
+    setTransactions(results);
+    setHitLimit(results.length >= QUERY_LIMIT);
     setIsLoading(false);
   }, [dateFilter?.start?.getTime(), dateFilter?.end?.getTime()]);
 
@@ -75,9 +80,10 @@ export function useDashboardData(dateFilter?: { start: Date | null; end: Date | 
     transactionCount: transactions.length,
   };
 
-  const savingsRate = stats.totalIncome > 0 
-    ? Math.round(((stats.totalIncome - stats.totalSpending) / stats.totalIncome) * 100)
-    : 0;
+  // Clamp savings rate between -100 and 100, show "N/A" when income < $50
+  const savingsRate: number | 'N/A' = stats.totalIncome < 50
+    ? 'N/A'
+    : Math.max(-100, Math.min(100, Math.round(((stats.totalIncome - stats.totalSpending) / stats.totalIncome) * 100)));
 
   // Spending by category
   const spendingByCategory: SpendingByCategory[] = transactions
@@ -116,30 +122,63 @@ export function useDashboardData(dateFilter?: { start: Date | null; end: Date | 
     .sort((a, b) => b.total - a.total)
     .slice(0, 3);
 
-  // Monthly trends
-  const monthlyTrends: MonthlyTrend[] = [];
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  
-  for (let i = 5; i >= 0; i--) {
-    const date = new Date();
-    date.setMonth(date.getMonth() - i);
-    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    const monthName = monthNames[date.getMonth()];
-    
-    const monthTransactions = transactions.filter(t => 
-      t.transaction_date.startsWith(monthKey)
-    );
-    
-    monthlyTrends.push({
-      month: monthName,
-      spending: monthTransactions
-        .filter(t => t.direction === 'debit' && !t.is_transfer)
-        .reduce((sum, t) => sum + t.amount, 0),
-      income: monthTransactions
-        .filter(t => t.direction === 'credit' && !t.is_transfer)
-        .reduce((sum, t) => sum + t.amount, 0),
-    });
-  }
+  // Monthly trends — respect date filter
+  const monthlyTrends: MonthlyTrend[] = useMemo(() => {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const trends: MonthlyTrend[] = [];
+
+    if (dateFilter?.start && dateFilter?.end) {
+      // Generate months within the filtered date range
+      const start = new Date(dateFilter.start.getFullYear(), dateFilter.start.getMonth(), 1);
+      const end = new Date(dateFilter.end.getFullYear(), dateFilter.end.getMonth(), 1);
+      
+      const current = new Date(start);
+      while (current <= end) {
+        const monthKey = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
+        const monthName = monthNames[current.getMonth()];
+        
+        const monthTransactions = transactions.filter(t => 
+          t.transaction_date.startsWith(monthKey)
+        );
+        
+        trends.push({
+          month: monthName,
+          spending: monthTransactions
+            .filter(t => t.direction === 'debit' && !t.is_transfer)
+            .reduce((sum, t) => sum + t.amount, 0),
+          income: monthTransactions
+            .filter(t => t.direction === 'credit' && !t.is_transfer)
+            .reduce((sum, t) => sum + t.amount, 0),
+        });
+        
+        current.setMonth(current.getMonth() + 1);
+      }
+    } else {
+      // Default: last 6 calendar months
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const monthName = monthNames[date.getMonth()];
+        
+        const monthTransactions = transactions.filter(t => 
+          t.transaction_date.startsWith(monthKey)
+        );
+        
+        trends.push({
+          month: monthName,
+          spending: monthTransactions
+            .filter(t => t.direction === 'debit' && !t.is_transfer)
+            .reduce((sum, t) => sum + t.amount, 0),
+          income: monthTransactions
+            .filter(t => t.direction === 'credit' && !t.is_transfer)
+            .reduce((sum, t) => sum + t.amount, 0),
+        });
+      }
+    }
+
+    return trends;
+  }, [transactions, dateFilter?.start?.getTime(), dateFilter?.end?.getTime()]);
 
   return {
     isLoading,
@@ -149,6 +188,7 @@ export function useDashboardData(dateFilter?: { start: Date | null; end: Date | 
     monthlyTrends,
     topMerchants,
     transactionCount: transactions.length,
+    hitLimit,
     refetch: fetchTransactions,
   };
 }
