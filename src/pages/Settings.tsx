@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { User, Bell, Shield, CreditCard, Trash2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, useRequireAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 
@@ -26,8 +26,8 @@ const profileSchema = z.object({
 });
 
 export default function Settings() {
+  useRequireAuth();
   const { user } = useAuth();
-  const { } = (await import("@/hooks/useAuth")).useRequireAuth ? {} : {};
 
   const { toast } = useToast();
 
