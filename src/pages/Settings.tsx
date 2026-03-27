@@ -27,6 +27,8 @@ const profileSchema = z.object({
 
 export default function Settings() {
   const { user } = useAuth();
+  const { } = (await import("@/hooks/useAuth")).useRequireAuth ? {} : {};
+
   const { toast } = useToast();
 
   const [firstName, setFirstName] = useState("");
