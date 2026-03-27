@@ -10,8 +10,10 @@ import { BudgetInsightsPanel } from "@/components/budgets/BudgetInsightsPanel";
 import { AddBudgetDialog } from "@/components/budgets/AddBudgetDialog";
 import { DateRangeFilter, type DatePreset } from "@/components/shared/DateRangeFilter";
 import { startOfMonth, endOfMonth } from "date-fns";
+import { useRequireAuth } from "@/hooks/useAuth";
 
 export default function Budgets() {
+  useRequireAuth();
   const now = new Date();
   const [dateRange, setDateRange] = useState<{ start: Date | null; end: Date | null }>({
     start: startOfMonth(now),

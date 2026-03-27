@@ -14,17 +14,20 @@ import {
   Target,
   Download,
   Store,
+  AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useNavigate } from "react-router-dom";
+import { useRequireAuth } from "@/hooks/useAuth";
 import { DateRangeFilter, type DatePreset } from "@/components/shared/DateRangeFilter";
 
 export default function Dashboard() {
+  useRequireAuth();
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [dateRange, setDateRange] = useState<{ start: Date | null; end: Date | null }>({ start: null, end: null });
-  const { isLoading, stats, savingsRate, spendingByCategory, monthlyTrends, topMerchants, transactionCount } = useDashboardData(dateRange);
+  const { isLoading, stats, savingsRate, spendingByCategory, monthlyTrends, topMerchants, transactionCount, hitLimit } = useDashboardData(dateRange);
   const navigate = useNavigate();
 
   const formatCurrency = (amount: number) =>
@@ -72,6 +75,8 @@ export default function Dashboard() {
   }
 
   const netCashFlow = stats.totalIncome - stats.totalSpending;
+  const savingsRateDisplay = savingsRate === 'N/A' ? 'N/A' : `${savingsRate}%`;
+  const savingsRateNum = typeof savingsRate === 'number' ? savingsRate : 0;
 
   return (
     <AppLayout>
@@ -88,6 +93,20 @@ export default function Dashboard() {
           onPresetChange={setDatePreset}
         />
       </div>
+
+      {/* Truncation Warning */}
+      {hitLimit && (
+        <Card className="mb-6 border-warning/50 bg-warning/5">
+          <CardContent className="py-3">
+            <div className="flex items-center gap-3">
+              <AlertTriangle size={18} className="text-warning" />
+              <span className="text-sm text-foreground">
+                Your data may be truncated — only the most recent 5,000 transactions are shown. Use date filters to narrow results.
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
@@ -112,13 +131,13 @@ export default function Dashboard() {
         />
         <StatCard
           title="Savings Rate"
-          value={`${savingsRate}%`}
+          value={savingsRateDisplay}
           icon={<TrendingUp size={20} />}
           iconVariant="purple"
         />
       </div>
 
-      {/* Charts Grid - matching uploaded layout */}
+      {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
         <Card className="lg:col-span-2 border-border/50">
           <CardHeader>
@@ -187,18 +206,25 @@ export default function Dashboard() {
       <div className="mb-8">
         <h2 className="text-2xl font-semibold text-foreground mb-4">Smart Insights</h2>
         <div className="space-y-3">
-          {savingsRate >= 20 ? (
+          {savingsRate === 'N/A' ? (
+            <InsightCard
+              icon={<span>ℹ️</span>}
+              title="Not enough income data"
+              description="Upload more statements to see your savings rate."
+              type="info"
+            />
+          ) : savingsRateNum >= 20 ? (
             <InsightCard
               icon={<span>💡</span>}
               title="Great savings rate!"
-              description={`You're saving ${savingsRate}% of your income, above the recommended 20%.`}
+              description={`You're saving ${savingsRateNum}% of your income, above the recommended 20%.`}
               type="success"
             />
-          ) : savingsRate >= 0 ? (
+          ) : savingsRateNum >= 0 ? (
             <InsightCard
               icon={<span>⚠️</span>}
               title="Savings could improve"
-              description={`You're saving ${savingsRate}% of your income. Aim for at least 20%.`}
+              description={`You're saving ${savingsRateNum}% of your income. Aim for at least 20%.`}
               type="warning"
               actionLabel="Review Budget"
               onAction={() => navigate('/budgets')}
